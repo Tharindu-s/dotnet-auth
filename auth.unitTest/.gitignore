@@ -1,0 +1,51 @@
+## Ignore build results
+bin/
+obj/
+out/
+
+## Ignore test results
+TestResults/
+*.coverage
+*.coveragexml
+*.testresults
+
+## Ignore user-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Ignore Visual Studio Code settings
+.vscode/
+
+## Ignore Rider settings
+.idea/
+
+## Ignore ASP.NET secrets (only if using Secret Manager)
+**/secrets.json
+
+## Ignore local environment override files
+appsettings.Development.json
+appsettings.Local.json
+*.env
+
+## Ignore NuGet packages and logs
+*.nupkg
+.nuget/
+*.log
+logs/
+
+## Ignore Docker artifacts (optional)
+**/docker-compose.override.yml
+docker-compose.override.yml
+
+## Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+## Ignore ReSharper
+_ReSharper.*
+*.DotSettings.user
+
+## Ignore EF Core Migrations snapshots (optional)
+Migrations/*Snapshot.cs
