@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using auth.webapi;
 using auth.webapi.Extentions;
 using auth.webapi.Interfaces;
+using auth.webapi.Middleware;
 using auth.webapi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +35,7 @@ var app = builder.Build();
 //     app.MapOpenApi();
 //     app.UseSwaggerUI();
 // }
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.MapOpenApi();

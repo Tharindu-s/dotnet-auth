@@ -1,3 +1,4 @@
+using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
 using auth.webapi.Interfaces;
 using auth.webapi.Models;
@@ -27,30 +28,26 @@ namespace auth.webapi.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] CreateUserDto createUserDto)
         {
-            try
+
+            if (!ModelState.IsValid)
             {
-                if (!ModelState.IsValid)
-                {
-                    return BadRequest(ModelState);
-                }
-
-                var result = await _authService.RegisterUserAsync(createUserDto);
-
-                // checks if an exception occurred during registration inside the service method, and if so, it returns an HTTP 400 Bad Request with the exception message
-                if (!string.IsNullOrEmpty(result.ExceptionMessage))
-                    return BadRequest(result.ExceptionMessage);
-
-                if (!result.IsSuccess)
-                {
-                    return BadRequest(result.Errors);
-                }
-
-                return Ok(result.UserDto);
+                return BadRequest(ModelState);
             }
-            catch (Exception ex)
+
+            var UserDto = await _authService.RegisterUserAsync(createUserDto);
+            return Ok(UserDto);
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginUserDto loginDto)
+        {
+            if (!ModelState.IsValid)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(ModelState);
             }
+
+            var userDto = await _authService.LoginUserAsync(loginDto);
+            return Ok(userDto);
         }
     }
 }
