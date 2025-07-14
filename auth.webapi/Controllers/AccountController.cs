@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace auth.webapi.Controllers
 {
-    [Route("api/auth")]
+    [Route("api/authentication")]
     [ApiController]
 
     public class AccountController : ControllerBase
