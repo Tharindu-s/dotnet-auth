@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dotnet-auth
+  namespace: dotnet-authentication
+  # labels:
+  #   app: dotnet-auth
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dotnet-auth
+  template:
+    metadata:
+      labels:
+        app: dotnet-auth
+    spec:
+      containers:
+        - name: my-app-container
+          image: tharindu007/dotnet-auth:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dotnet-auth
+  namespace: dotnet-authentication
+spec:
+  selector:
+    app: dotnet-auth
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: LoadBalancer
