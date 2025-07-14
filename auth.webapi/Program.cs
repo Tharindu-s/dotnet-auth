@@ -1,41 +1,70 @@
+using System.IdentityModel.Tokens.Jwt;
+using auth.webapi;
+using auth.webapi.Extentions;
+using auth.webapi.Interfaces;
+using auth.webapi.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddLogging();
+builder.Services.ConfigureDatabase(builder.Configuration);
+builder.Services.ConfigureIdentity();
+builder.Services.ConfigureJwtAuthentication(builder.Configuration);
+builder.Services.ConfigureCors();
+builder.Services.AddAuthorization();
+builder.Services.AddControllers();
+
+// Interfaces
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IConfigurationHelperService, ConfigurationHelper>();
+
+// Swagger/OpenAPI
 builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerDocumentation();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Configure middleware
+// if (app.Environment.IsDevelopment())
+// {
+//     app.MapOpenApi();
+//     app.UseSwaggerUI();
+// }
+app.UseSwagger();
+app.UseSwaggerUI();
+app.MapOpenApi();
+
+// Add before app.UseAuthentication();
+app.Use(async (context, next) =>
 {
-    app.MapOpenApi();
-}
+    var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+    if (token != null)
+    {
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+            var expiration = jwtToken.ValidTo;
+            Console.WriteLine($"Token expires at: {expiration} UTC, Current time: {DateTime.UtcNow} UTC");
+            Console.WriteLine($"Is token expired: {DateTime.UtcNow > expiration}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reading token: {ex.Message}");
+        }
+    }
+    await next();
+});
 
 app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.UseSwagger();
+app.UseCors("AllowAllOrigins");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
