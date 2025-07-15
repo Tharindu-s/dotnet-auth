@@ -1,15 +1,16 @@
 using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
+using auth.webapi.DTO.Auth.Token;
 using auth.webapi.Interfaces;
 using auth.webapi.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace auth.webapi.Controllers
 {
     [Route("api/auth")]
-    [ApiController]
-
+    [ApiController] // no need to validate the model state in each endpoint after adding this
     public class AccountController : ControllerBase
     {
         private readonly ILogger<AccountController> _logger;
@@ -28,26 +29,31 @@ namespace auth.webapi.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] CreateUserDto createUserDto)
         {
-
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            var UserDto = await _authService.RegisterUserAsync(createUserDto);
-            return Ok(UserDto);
+            var user = await _authService.RegisterUserAsync(createUserDto);
+            return Ok(user);
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginUserDto loginDto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            var userDto = await _authService.LoginUserAsync(loginDto);
-            return Ok(userDto);
+            var user = await _authService.LoginUserAsync(loginDto);
+            return Ok(user);
         }
+
+        [Authorize]
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] SendTokenRefreshRequest tokenDto)
+        {
+            var tokens = await _authService.RefreshTokenAsync(tokenDto);
+            return Ok(tokens);
+        }
+
+        [Authorize]
+        [HttpGet("test")]
+        public async Task<IActionResult> Test()
+        {
+            return Ok("ok");
+        }
+
     }
 }

@@ -49,4 +49,11 @@ namespace auth.webapi.Helpers
         public UserCreationFailedException(string message, Exception inner) : base(message, inner) { }
     }
 
+    public class InvalidTokenException : AppException
+    {
+        public InvalidTokenException() : base("The access token is invalid or malformed.") { }
+        public InvalidTokenException(string message) : base(message) { }
+    }
+
+
 }

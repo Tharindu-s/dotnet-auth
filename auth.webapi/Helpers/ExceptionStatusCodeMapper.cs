@@ -15,6 +15,8 @@ namespace auth.webapi.Helpers
             { typeof(AppUnauthorizedException), HttpStatusCode.Unauthorized },
             { typeof(EmailAlreadyExistsException), HttpStatusCode.Conflict },
             { typeof(RefreshTokenExpiredException), HttpStatusCode.Unauthorized },
+            { typeof(UserCreationFailedException), HttpStatusCode.BadRequest},
+            {typeof (InvalidTokenException), HttpStatusCode.Unauthorized}
             // Add more here as needed
         };
     }

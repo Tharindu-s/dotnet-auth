@@ -1,5 +1,7 @@
+using System.ComponentModel;
 using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
+using auth.webapi.DTO.Auth.Token;
 using auth.webapi.Helpers;
 using auth.webapi.Interfaces;
 using auth.webapi.Models;
@@ -60,6 +62,41 @@ namespace auth.webapi.Services
             };
         }
 
+        public async Task<ResponseTokenRefreshRequest> RefreshTokenAsync(SendTokenRefreshRequest refreshTokenDto)
+        {
+            var principal = _tokenService.GetPrincipalFromExpiredToken(refreshTokenDto.AccessToken);
+            if (principal == null)
+                throw new InvalidTokenException();
+
+            var username = principal.Identity?.Name;
+            if (username == null)
+                throw new UserNotFoundException();
+
+            // Fetch the user by username
+            var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == username);
+            if (user == null)
+                throw new UserNotFoundException();
+
+            // Verify the refresh token
+            if (user.RefreshToken != refreshTokenDto.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+                throw new RefreshTokenExpiredException();
+
+            // Generate new tokens
+            var newAccessToken = _tokenService.CreateToken(user);
+            var newRefreshToken = _tokenService.CreateRefreshToken();
+
+            // Update refresh token in the database
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            await _userManager.UpdateAsync(user);
+
+            return new ResponseTokenRefreshRequest
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken
+            };
+        }
+
         public async Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto)
         {
             var appUser = new AppUser
@@ -69,6 +106,13 @@ namespace auth.webapi.Services
                 FullName = createUserDto.FullName,
                 UserName = createUserDto.Email.ToLower(),
             };
+
+            _logger.LogInformation("Checking email");
+            var existingUser = await _userManager.FindByEmailAsync(createUserDto.Email);
+            if (existingUser is not null)
+            {
+                throw new EmailAlreadyExistsException();
+            }
 
             _logger.LogInformation("user creating");
             var createdUser = await _userManager.CreateAsync(appUser, createUserDto.Password);
