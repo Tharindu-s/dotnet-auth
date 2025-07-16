@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
 using auth.webapi.DTO.Auth.Token;
@@ -58,13 +57,13 @@ namespace auth.webapi.Controllers
             return Ok("Logged out successfully");
         }
 
-        [Authorize]
-        [HttpGet("test")]
-        public async Task<IActionResult> Test()
-        {
+        // [Authorize]
+        // [HttpGet("test")]
+        // public async Task<IActionResult> Test()
+        // {
 
-            return Ok("ok");
-        }
+        //     return Ok("ok");
+        // }
 
     }
 }
