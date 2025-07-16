@@ -57,13 +57,5 @@ namespace auth.webapi.Controllers
             return Ok("Logged out successfully");
         }
 
-        // [Authorize]
-        // [HttpGet("test")]
-        // public async Task<IActionResult> Test()
-        // {
-
-        //     return Ok("ok");
-        // }
-
     }
 }
