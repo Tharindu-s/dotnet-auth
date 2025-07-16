@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
 using auth.webapi.DTO.Auth.Token;
@@ -49,9 +50,19 @@ namespace auth.webapi.Controllers
         }
 
         [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            // gets user details from the claims(user doesn't have to send anything cause user claims are stored in access token that gets send through the api header). Sends the claim to the service for logic.
+            await _authService.LogoutAsync(User);
+            return Ok("Logged out successfully");
+        }
+
+        [Authorize]
         [HttpGet("test")]
         public async Task<IActionResult> Test()
         {
+
             return Ok("ok");
         }
 

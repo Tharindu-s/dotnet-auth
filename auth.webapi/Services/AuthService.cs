@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Security.Claims;
 using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
 using auth.webapi.DTO.Auth.Token;
@@ -60,6 +61,28 @@ namespace auth.webapi.Services
                 RefreshToken = refreshToken,
                 RefreshTokenExpiryTime = user.RefreshTokenExpiryTime
             };
+        }
+
+        public async Task LogoutAsync(ClaimsPrincipal userPrincipal)
+        {
+            var validEmail = userPrincipal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+
+            if (validEmail == null)
+                throw new InvalidTokenException();
+            // cause the details are taken from the token
+
+
+            var user = await _userManager.Users.FirstOrDefaultAsync(e => e.Email == validEmail);
+
+            if (user == null)
+                throw new UserNotFoundException();
+
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = DateTime.MinValue; // smallest possible date time value
+
+            await _userManager.UpdateAsync(user);
+
+            Console.WriteLine("logged out successfully");
         }
 
         public async Task<ResponseTokenRefreshRequest> RefreshTokenAsync(SendTokenRefreshRequest refreshTokenDto)

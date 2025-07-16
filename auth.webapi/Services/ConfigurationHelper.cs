@@ -18,5 +18,10 @@ namespace auth.webapi.Services
         {
             return _configuration[key] ?? throw new InvalidOperationException($"{key} not found in configuration.");
         }
+
+        public IConfigurationSection GetSection(string key)
+        {
+            return _configuration.GetSection(key);
+        }
     }
 }
