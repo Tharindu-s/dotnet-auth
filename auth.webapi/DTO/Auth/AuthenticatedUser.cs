@@ -4,9 +4,9 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace auth.webapi.DTO.Auth.Register
+namespace auth.webapi.DTO.Auth
 {
-    public class ResponseUserDto
+    public class AuthenticatedUser
     {
         [Required]
         public required string Id { get; set; }
@@ -20,8 +20,5 @@ namespace auth.webapi.DTO.Auth.Register
         public required string City { get; set; }
         [Required]
         public required string AccessToken { get; set; }
-        [Required]
-        public required string RefreshToken { get; set; }
-        public DateTime RefreshTokenExpiryTime { get; set; }
     }
 }

@@ -1,7 +1,10 @@
 using System.ComponentModel;
 using System.Security.Claims;
+using auth.webapi.Data;
+using auth.webapi.DTO.Auth;
 using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
+using auth.webapi.DTO.Auth.Session;
 using auth.webapi.DTO.Auth.Token;
 using auth.webapi.Helpers;
 using auth.webapi.Interfaces;
@@ -19,17 +22,35 @@ namespace auth.webapi.Services
         private readonly ILogger<AuthService> _logger;
         private readonly ITokenService _tokenService;
         private readonly IEmailService _emailService;
+        private readonly ApplicationDbContext _context;
 
-        public AuthService(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, ILogger<AuthService> logger, ITokenService tokenService, IEmailService emailService)
+        public AuthService(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, ILogger<AuthService> logger, ITokenService tokenService, IEmailService emailService, ApplicationDbContext context)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
             _tokenService = tokenService;
             _emailService = emailService;
+            _context = context;
         }
 
-        public async Task<ResponseUserDto> LoginUserAsync(LoginUserDto loginDto)
+        public async Task<List<UserSessionDto>> GetUserSessionsAsync(string userId)
+        {
+            var sessions = await _context.RefreshTokens
+        .Where(rt => rt.UserId == userId && !rt.IsRevoked && rt.Expires > DateTime.UtcNow)
+        .Select(rt => new UserSessionDto
+        {
+            TokenId = rt.Id,
+            Device = rt.Device,
+            IPAddress = rt.IPAddress,
+            ExpiresAt = rt.Expires
+        })
+        .ToListAsync();
+
+            return sessions;
+        }
+
+        public async Task<ResponseUserDto> LoginUserAsync(LoginUserDto loginDto, string ipAddress, string userAgent)
         {
 
             _logger.LogInformation("Starting");
@@ -46,9 +67,18 @@ namespace auth.webapi.Services
             var refreshToken = _tokenService.CreateRefreshToken();
             var accessToken = _tokenService.CreateToken(user);
 
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-            await _userManager.UpdateAsync(user);
+
+            var refreshTokenEntity = new RefreshToken
+            {
+                Token = refreshToken,
+                Expires = DateTime.UtcNow.AddDays(7),
+                UserId = user.Id,
+                Device = userAgent,
+                IPAddress = ipAddress
+            };
+
+            _context.RefreshTokens.Add(refreshTokenEntity);
+            await _context.SaveChangesAsync();
 
             return new ResponseUserDto
             {
@@ -59,11 +89,11 @@ namespace auth.webapi.Services
                 City = user.City!,
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                RefreshTokenExpiryTime = user.RefreshTokenExpiryTime
+                RefreshTokenExpiry = refreshTokenEntity.Expires
             };
         }
 
-        public async Task LogoutAsync(ClaimsPrincipal userPrincipal)
+        public async Task LogoutAsync(ClaimsPrincipal userPrincipal, string refreshToken)
         {
             var validEmail = userPrincipal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
 
@@ -71,23 +101,26 @@ namespace auth.webapi.Services
                 throw new InvalidTokenException();
             // cause the details are taken from the token
 
-
             var user = await _userManager.Users.FirstOrDefaultAsync(e => e.Email == validEmail);
 
             if (user == null)
                 throw new UserNotFoundException();
 
-            user.RefreshToken = null;
-            user.RefreshTokenExpiryTime = DateTime.MinValue; // smallest possible date time value
+            var currentToken = await _context.RefreshTokens.FirstOrDefaultAsync(rt => rt.UserId == user.Id && rt.Token == refreshToken && !rt.IsRevoked);
 
-            await _userManager.UpdateAsync(user);
+            if (currentToken == null)
+                throw new InvalidTokenException();
+
+            // revoke the token
+            currentToken.IsRevoked = true;
+            await _context.SaveChangesAsync();
 
             Console.WriteLine("logged out successfully");
         }
 
-        public async Task<ResponseTokenRefreshRequest> RefreshTokenAsync(SendTokenRefreshRequest refreshTokenDto)
+        public async Task<ResponseTokenRefreshRequest> RefreshTokenAsync(string accessToken, string refreshToken, string ipAddress, string userAgent)
         {
-            var principal = _tokenService.GetPrincipalFromExpiredToken(refreshTokenDto.AccessToken);
+            var principal = _tokenService.GetPrincipalFromExpiredToken(accessToken);
             if (principal == null)
                 throw new InvalidTokenException();
 
@@ -100,18 +133,31 @@ namespace auth.webapi.Services
             if (user == null)
                 throw new UserNotFoundException();
 
-            // Verify the refresh token
-            if (user.RefreshToken != refreshTokenDto.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            var currentToken = await _context.RefreshTokens.FirstOrDefaultAsync(
+                rt => rt.UserId == user.Id && rt.Token == refreshToken && !rt.IsRevoked
+            );
+
+            if (currentToken == null || currentToken.Expires <= DateTime.UtcNow)
                 throw new RefreshTokenExpiredException();
 
             // Generate new tokens
             var newAccessToken = _tokenService.CreateToken(user);
             var newRefreshToken = _tokenService.CreateRefreshToken();
 
-            // Update refresh token in the database
-            user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-            await _userManager.UpdateAsync(user);
+            // Revoke the old token and save the new one
+            currentToken.IsRevoked = true;
+
+            var refreshTokenEntity = new RefreshToken
+            {
+                Token = newRefreshToken,
+                UserId = user.Id,
+                Expires = DateTime.UtcNow.AddDays(7),
+                Device = userAgent,
+                IPAddress = ipAddress
+            };
+
+            _context.RefreshTokens.Add(refreshTokenEntity);
+            await _context.SaveChangesAsync();
 
             return new ResponseTokenRefreshRequest
             {
@@ -120,7 +166,7 @@ namespace auth.webapi.Services
             };
         }
 
-        public async Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto)
+        public async Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto, string ipAddress, string userAgent)
         {
             var appUser = new AppUser
             {
@@ -130,14 +176,12 @@ namespace auth.webapi.Services
                 UserName = createUserDto.Email.ToLower(),
             };
 
-            _logger.LogInformation("Checking email");
             var existingUser = await _userManager.FindByEmailAsync(createUserDto.Email);
             if (existingUser is not null)
             {
                 throw new EmailAlreadyExistsException();
             }
 
-            _logger.LogInformation("user creating");
             var createdUser = await _userManager.CreateAsync(appUser, createUserDto.Password);
             if (!createdUser.Succeeded)
                 throw new UserCreationFailedException("Failed to create the user");
@@ -146,26 +190,33 @@ namespace auth.webapi.Services
             if (!roleResult.Succeeded)
                 throw new UserCreationFailedException("Failed to create the user (role issue)");
 
-            _logger.LogInformation("creating tokens");
             var accessToken = _tokenService.CreateToken(appUser);
             var refreshToken = _tokenService.CreateRefreshToken();
 
-            appUser.RefreshToken = refreshToken;
-            appUser.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(30);
-            await _userManager.UpdateAsync(appUser);
+            var refreshTokenEntity = new RefreshToken
+            {
+                Token = refreshToken,
+                Expires = DateTime.UtcNow.AddDays(7),
+                UserId = appUser.Id,
+                Device = userAgent,
+                IPAddress = ipAddress
+            };
 
-            _logger.LogInformation("sending email");
+            _context.RefreshTokens.Add(refreshTokenEntity);
+            await _context.SaveChangesAsync();
+
             await _emailService.SendEmailAsync(appUser.Email, "Welcome to Our App", $"<h1>Hello {appUser.UserName}!</h1><p>Thanks for registering!</p>");
 
             return new ResponseUserDto
             {
                 Id = appUser.Id,
-                FullName = appUser.FullName,
-                Email = appUser.Email,
-                City = appUser.City,
-                UserName = appUser.UserName,
+                FullName = appUser.FullName!,
+                Email = appUser.Email!,
+                UserName = appUser.UserName!,
+                City = appUser.City!,
                 AccessToken = accessToken,
-                RefreshToken = refreshToken
+                RefreshToken = refreshToken,
+                RefreshTokenExpiry = refreshTokenEntity.Expires
             };
         }
     }

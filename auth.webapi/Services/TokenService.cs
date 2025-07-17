@@ -57,7 +57,7 @@ namespace auth.webapi.Services
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(2), // Set token expiration (2 min)
+                Expires = DateTime.UtcNow.AddMinutes(15), // Set token expiration (15 min)
                 SigningCredentials = creds,
                 Issuer = _jwtIssuer,
                 Audience = _jwtAudience
