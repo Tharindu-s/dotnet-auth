@@ -12,8 +12,8 @@ using auth.webapi.Data;
 namespace auth.webapi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250717125310_AuthChange")]
-    partial class AuthChange
+    [Migration("20250805163633_RefreshTokenSchemaChange")]
+    partial class RefreshTokenSchemaChange
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -179,6 +179,9 @@ namespace auth.webapi.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("ApplicationClientId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("City")
                         .HasColumnType("text");
 
@@ -231,6 +234,8 @@ namespace auth.webapi.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ApplicationClientId");
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
@@ -241,6 +246,28 @@ namespace auth.webapi.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("auth.webapi.Models.ApplicationClient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApiKeyHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ApplicationClient");
+                });
+
             modelBuilder.Entity("auth.webapi.Models.RefreshToken", b =>
                 {
                     b.Property<int>("Id")
@@ -248,6 +275,9 @@ namespace auth.webapi.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<Guid>("ApplicationClientId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Device")
                         .IsRequired()
@@ -272,6 +302,8 @@ namespace auth.webapi.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApplicationClientId");
 
                     b.HasIndex("UserId");
 
@@ -329,13 +361,32 @@ namespace auth.webapi.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("auth.webapi.Models.AppUser", b =>
+                {
+                    b.HasOne("auth.webapi.Models.ApplicationClient", "App")
+                        .WithMany("Users")
+                        .HasForeignKey("ApplicationClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("App");
+                });
+
             modelBuilder.Entity("auth.webapi.Models.RefreshToken", b =>
                 {
+                    b.HasOne("auth.webapi.Models.ApplicationClient", "App")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("ApplicationClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("auth.webapi.Models.AppUser", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("App");
 
                     b.Navigation("User");
                 });
@@ -343,6 +394,13 @@ namespace auth.webapi.Migrations
             modelBuilder.Entity("auth.webapi.Models.AppUser", b =>
                 {
                     b.Navigation("RefreshTokens");
+                });
+
+            modelBuilder.Entity("auth.webapi.Models.ApplicationClient", b =>
+                {
+                    b.Navigation("RefreshTokens");
+
+                    b.Navigation("Users");
                 });
 #pragma warning restore 612, 618
         }

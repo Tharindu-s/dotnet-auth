@@ -22,15 +22,17 @@ namespace auth.webapi.Services
         private readonly ILogger<AuthService> _logger;
         private readonly ITokenService _tokenService;
         private readonly IEmailService _emailService;
+        private readonly IApplicationClientService _applicationClientService;
         private readonly ApplicationDbContext _context;
 
-        public AuthService(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, ILogger<AuthService> logger, ITokenService tokenService, IEmailService emailService, ApplicationDbContext context)
+        public AuthService(UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, ILogger<AuthService> logger, ITokenService tokenService, IEmailService emailService, IApplicationClientService applicationClientService, ApplicationDbContext context)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
             _tokenService = tokenService;
             _emailService = emailService;
+            _applicationClientService = applicationClientService;
             _context = context;
         }
 
@@ -50,11 +52,21 @@ namespace auth.webapi.Services
             return sessions;
         }
 
-        public async Task<ResponseUserDto> LoginUserAsync(LoginUserDto loginDto, string ipAddress, string userAgent)
+        public async Task<ResponseUserDto> LoginUserAsync(LoginUserDto loginDto, string ipAddress, string userAgent, Guid appId, string apiKey)
         {
 
+            var hashedApiKey = _applicationClientService.HashApiKey(apiKey);
+            _logger.LogInformation("hashed api key is {HashedApiKey}", hashedApiKey);
+            // Validate the client application using the provided appId and apiKey
+            var appClient = await _context.ApplicationClient.FirstOrDefaultAsync(a => a.Id == appId && a.ApiKeyHash == hashedApiKey);
+
+            if (appClient == null)
+                throw new ApplicationClientAuthenticationException("Client application credentials do not match");
+
+
+
             _logger.LogInformation("Starting");
-            var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Email == loginDto.Email.ToLower());
+            var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Email == loginDto.Email.ToLower() && x.ApplicationClientId == appId);
 
             if (user == null)
                 throw new InvalidCredentialsException();
@@ -74,7 +86,8 @@ namespace auth.webapi.Services
                 Expires = DateTime.UtcNow.AddDays(7),
                 UserId = user.Id,
                 Device = userAgent,
-                IPAddress = ipAddress
+                IPAddress = ipAddress,
+                ApplicationClientId = appId
             };
 
             _context.RefreshTokens.Add(refreshTokenEntity);
@@ -153,7 +166,9 @@ namespace auth.webapi.Services
                 UserId = user.Id,
                 Expires = DateTime.UtcNow.AddDays(7),
                 Device = userAgent,
-                IPAddress = ipAddress
+                IPAddress = ipAddress,
+                ApplicationClientId = Guid.Empty
+
             };
 
             _context.RefreshTokens.Add(refreshTokenEntity);
@@ -166,21 +181,29 @@ namespace auth.webapi.Services
             };
         }
 
-        public async Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto, string ipAddress, string userAgent)
+        public async Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto, string ipAddress, string userAgent, Guid appId, string apiKey)
         {
+            var hashedApiKey = _applicationClientService.HashApiKey(apiKey);
+            _logger.LogInformation("hashed api key is {HashedApiKey}", hashedApiKey);
+            // Validate the client application using the provided appId and apiKey
+            var appClient = await _context.ApplicationClient.FirstOrDefaultAsync(a => a.Id == appId && a.ApiKeyHash == hashedApiKey);
+
+            if (appClient == null)
+                throw new ApplicationClientAuthenticationException("Client application credentials do not match");
+
             var appUser = new AppUser
             {
                 Email = createUserDto.Email,
                 City = createUserDto.City,
                 FullName = createUserDto.FullName,
                 UserName = createUserDto.Email.ToLower(),
+                ApplicationClientId = appClient.Id,
             };
 
-            var existingUser = await _userManager.FindByEmailAsync(createUserDto.Email);
-            if (existingUser is not null)
-            {
-                throw new EmailAlreadyExistsException();
-            }
+            var existingUser = await _context.Users.Where(u => u.Email == createUserDto.Email && u.ApplicationClientId == appId).FirstOrDefaultAsync();
+
+            if (existingUser != null)
+                throw new EmailAlreadyExistsException("User with this email already exists");
 
             var createdUser = await _userManager.CreateAsync(appUser, createUserDto.Password);
             if (!createdUser.Succeeded)
@@ -199,7 +222,8 @@ namespace auth.webapi.Services
                 Expires = DateTime.UtcNow.AddDays(7),
                 UserId = appUser.Id,
                 Device = userAgent,
-                IPAddress = ipAddress
+                IPAddress = ipAddress,
+                ApplicationClientId = appId
             };
 
             _context.RefreshTokens.Add(refreshTokenEntity);

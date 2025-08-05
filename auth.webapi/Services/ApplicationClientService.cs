@@ -34,13 +34,13 @@ namespace auth.webapi.Services
 
         public async Task<ResponseCreateApplicationClientDto> RegisterApplication(CreateApplicationClientDto createDto)
         {
+            // rawkey will be used by the user as an API key
+            // hashedKey will be stored in the database
             var rawkey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-            var appId = Guid.NewGuid();
             var hashedKey = HashApiKey(rawkey);
 
             var applicationClient = new ApplicationClient
             {
-                AppId = appId,
                 Name = createDto.Name,
                 ApiKeyHash = hashedKey
             };
@@ -50,7 +50,7 @@ namespace auth.webapi.Services
 
             return new ResponseCreateApplicationClientDto
             {
-                AppId = appId,
+                Id = applicationClient.Id,
                 RawApiKey = rawkey
             };
         }

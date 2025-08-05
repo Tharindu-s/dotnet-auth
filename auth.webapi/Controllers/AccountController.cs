@@ -34,8 +34,19 @@ namespace auth.webapi.Controllers
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var userAgent = Request.Headers["User-Agent"].ToString() ?? "Unknown";
+            var apiKey = Request.Headers["X-Api-Key"].ToString();
 
-            var user = await _authService.RegisterUserAsync(createUserDto, ipAddress, userAgent);
+            // converts the app id from the header to a Guid, if it fails it will return Guid.Empty
+            Guid.TryParse(Request.Headers["X-App-Id"], out var appId);
+            if (string.IsNullOrEmpty(apiKey) || appId == Guid.Empty)
+            {
+                throw new ApplicationClientAuthenticationException();
+            }
+
+            _logger.LogInformation("AppId is {AppId} and ApiKey is {ApiKey}", appId, apiKey);
+
+
+            var user = await _authService.RegisterUserAsync(createUserDto, ipAddress, userAgent, appId, apiKey);
 
             Response.Cookies.Append("refreshToken", user.RefreshToken, new CookieOptions
             {
@@ -61,8 +72,18 @@ namespace auth.webapi.Controllers
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var userAgent = Request.Headers["User-Agent"].ToString() ?? "Unknown";
+            var apiKey = Request.Headers["X-Api-Key"].ToString();
 
-            var user = await _authService.LoginUserAsync(loginDto, ipAddress, userAgent);
+            // converts the app id from the header to a Guid, if it fails it will return Guid.Empty
+            Guid.TryParse(Request.Headers["X-App-Id"], out var appId);
+            if (string.IsNullOrEmpty(apiKey) || appId == Guid.Empty)
+            {
+                throw new ApplicationClientAuthenticationException();
+            }
+
+            _logger.LogInformation("AppId is {AppId} and ApiKey is {ApiKey}", appId, apiKey);
+
+            var user = await _authService.LoginUserAsync(loginDto, ipAddress, userAgent, appId, apiKey);
 
             Response.Cookies.Append("refreshToken", user.RefreshToken, new CookieOptions
             {

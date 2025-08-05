@@ -30,7 +30,7 @@ namespace auth.webapi.Controllers
 
             return Ok(new ResponseCreateApplicationClientDto
             {
-                AppId = result.AppId,
+                Id = result.Id,
                 RawApiKey = result.RawApiKey
             });
         }

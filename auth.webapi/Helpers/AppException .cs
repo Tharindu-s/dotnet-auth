@@ -30,6 +30,12 @@ namespace auth.webapi.Helpers
         public AppUnauthorizedException(string message) : base(message) { }
     }
 
+    public class ApplicationClientAuthenticationException : AppException
+    {
+        public ApplicationClientAuthenticationException() : base("Application client authentication failed. Check if the API Key and App ID are correct.") { }
+        public ApplicationClientAuthenticationException(string message) : base(message) { }
+    }
+
     public class RefreshTokenExpiredException : AppException
     {
         public RefreshTokenExpiredException() : base("Refresh token has expired.") { }
