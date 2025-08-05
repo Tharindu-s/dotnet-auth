@@ -20,6 +20,7 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IApplicationClientService, ApplicationClientService>();
 builder.Services.AddScoped<IConfigurationHelperService, ConfigurationHelper>();
 
 // Swagger/OpenAPI

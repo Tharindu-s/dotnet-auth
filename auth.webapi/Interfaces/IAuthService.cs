@@ -4,7 +4,6 @@ using auth.webapi.DTO.Auth.Login;
 using auth.webapi.DTO.Auth.Register;
 using auth.webapi.DTO.Auth.Session;
 using auth.webapi.DTO.Auth.Token;
-using Microsoft.AspNetCore.Identity;
 
 namespace auth.webapi.Interfaces
 {

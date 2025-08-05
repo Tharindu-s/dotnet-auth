@@ -13,6 +13,7 @@ namespace auth.webapi.Data
         }
 
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<ApplicationClient> ApplicationClient { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

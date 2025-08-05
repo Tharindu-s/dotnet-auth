@@ -87,13 +87,13 @@ namespace auth.webapi.Controllers
         public async Task<IActionResult> Refresh()
         {
             var refreshToken = Request.Cookies["refreshToken"];
+            var accessToken = Request.Headers["Authorization"].ToString()?.Replace("Bearer ", "");
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var userAgent = Request.Headers["User-Agent"].ToString() ?? "Unknown";
 
             if (refreshToken == null)
                 throw new RefreshTokenExpiredException();
 
-            var accessToken = Request.Headers["Authorization"].ToString()?.Replace("Bearer ", "");
             if (accessToken == null)
                 throw new AppUnauthorizedException("Missing access token");
 
@@ -128,6 +128,7 @@ namespace auth.webapi.Controllers
         [HttpGet("sessions")]
         public async Task<IActionResult> GetSessions()
         {
+            Console.WriteLine($"claim types are the following: {ClaimTypes.NameIdentifier}");
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId == null)
                 return Unauthorized();
