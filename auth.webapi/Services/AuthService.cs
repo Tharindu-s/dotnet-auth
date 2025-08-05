@@ -106,7 +106,7 @@ namespace auth.webapi.Services
             };
         }
 
-        public async Task LogoutAsync(ClaimsPrincipal userPrincipal, string refreshToken)
+        public async Task LogoutAsync(ClaimsPrincipal userPrincipal, string refreshToken, Guid appId, string apiKey)
         {
             var validEmail = userPrincipal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
 
@@ -114,7 +114,7 @@ namespace auth.webapi.Services
                 throw new InvalidTokenException();
             // cause the details are taken from the token
 
-            var user = await _userManager.Users.FirstOrDefaultAsync(e => e.Email == validEmail);
+            var user = await _userManager.Users.FirstOrDefaultAsync(e => e.Email == validEmail && e.ApplicationClientId == appId);
 
             if (user == null)
                 throw new UserNotFoundException();
@@ -167,8 +167,7 @@ namespace auth.webapi.Services
                 Expires = DateTime.UtcNow.AddDays(7),
                 Device = userAgent,
                 IPAddress = ipAddress,
-                ApplicationClientId = Guid.Empty
-
+                ApplicationClientId = currentToken.ApplicationClientId
             };
 
             _context.RefreshTokens.Add(refreshTokenEntity);

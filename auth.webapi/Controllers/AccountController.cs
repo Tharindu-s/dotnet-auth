@@ -136,12 +136,22 @@ namespace auth.webapi.Controllers
         public async Task<IActionResult> Logout()
         {
             var refreshToken = Request.Cookies["refreshToken"];
+            var apiKey = Request.Headers["X-Api-Key"].ToString();
+
+            // converts the app id from the header to a Guid, if it fails it will return Guid.Empty
+            Guid.TryParse(Request.Headers["X-App-Id"], out var appId);
+            if (string.IsNullOrEmpty(apiKey) || appId == Guid.Empty)
+            {
+                throw new ApplicationClientAuthenticationException();
+            }
+
+            _logger.LogInformation("AppId is {AppId} and ApiKey is {ApiKey}", appId, apiKey);
 
             if (string.IsNullOrEmpty(refreshToken))
                 return Unauthorized("Refresh token not found");
 
             // gets user details from the claims(user doesn't have to send anything cause user claims are stored in access token that gets send through the api header). Sends the claim to the service for logic.
-            await _authService.LogoutAsync(User, refreshToken);
+            await _authService.LogoutAsync(User, refreshToken, appId, apiKey);
             return Ok("Logged out successfully");
         }
 
