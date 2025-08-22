@@ -63,9 +63,11 @@ namespace auth.webapi.Extentions
             services.AddCors(options =>
             {
                 options.AddPolicy("AllowAllOrigins", builder =>
-                    builder.AllowAnyOrigin()
+                    builder.WithOrigins("http://localhost:3000")
                            .AllowAnyMethod()
-                           .AllowAnyHeader());
+                           .AllowAnyHeader()
+                           .AllowCredentials()
+                           );
             });
         }
     }

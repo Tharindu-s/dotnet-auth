@@ -131,27 +131,19 @@ namespace auth.webapi.Services
             Console.WriteLine("logged out successfully");
         }
 
-        public async Task<ResponseTokenRefreshRequest> RefreshTokenAsync(string accessToken, string refreshToken, string ipAddress, string userAgent)
+        public async Task<ResponseTokenRefreshRequest> RefreshTokenAsync(string refreshToken, string ipAddress, string userAgent)
         {
-            var principal = _tokenService.GetPrincipalFromExpiredToken(accessToken);
-            if (principal == null)
-                throw new InvalidTokenException();
-
-            var username = principal.Identity?.Name;
-            if (username == null)
-                throw new UserNotFoundException();
-
-            // Fetch the user by username
-            var user = await _userManager.Users.FirstOrDefaultAsync(x => x.UserName == username);
-            if (user == null)
-                throw new UserNotFoundException();
-
-            var currentToken = await _context.RefreshTokens.FirstOrDefaultAsync(
-                rt => rt.UserId == user.Id && rt.Token == refreshToken && !rt.IsRevoked
-            );
+            // Find the refresh token in DB
+            var currentToken = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .FirstOrDefaultAsync(rt => rt.Token == refreshToken && !rt.IsRevoked);
 
             if (currentToken == null || currentToken.Expires <= DateTime.UtcNow)
                 throw new RefreshTokenExpiredException();
+
+            var user = currentToken.User;
+            if (user == null)
+                throw new UserNotFoundException();
 
             // Generate new tokens
             var newAccessToken = _tokenService.CreateToken(user);

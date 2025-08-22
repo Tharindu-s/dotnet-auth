@@ -11,7 +11,7 @@ namespace auth.webapi.Interfaces
     {
         Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto, string ipAddress, string userAgent, Guid appId, string apiKey);
         Task<ResponseUserDto> LoginUserAsync(LoginUserDto loginDto, string ipAddress, string userAgent, Guid appId, string apiKey);
-        Task<ResponseTokenRefreshRequest> RefreshTokenAsync(string accessToken, string refreshToken, string ipAddress, string userAgent);
+        Task<ResponseTokenRefreshRequest> RefreshTokenAsync(string refreshToken, string ipAddress, string userAgent);
         Task LogoutAsync(ClaimsPrincipal userPrincipal, string refreshToken, Guid appId, string apiKey);
         Task<List<UserSessionDto>> GetUserSessionsAsync(string userId);
     }

@@ -108,17 +108,14 @@ namespace auth.webapi.Controllers
         public async Task<IActionResult> Refresh()
         {
             var refreshToken = Request.Cookies["refreshToken"];
-            var accessToken = Request.Headers["Authorization"].ToString()?.Replace("Bearer ", "");
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var userAgent = Request.Headers["User-Agent"].ToString() ?? "Unknown";
 
             if (refreshToken == null)
                 throw new RefreshTokenExpiredException();
 
-            if (accessToken == null)
-                throw new AppUnauthorizedException("Missing access token");
 
-            var tokens = await _authService.RefreshTokenAsync(accessToken, refreshToken, ipAddress, userAgent);
+            var tokens = await _authService.RefreshTokenAsync(refreshToken, ipAddress, userAgent);
 
             Response.Cookies.Append("refreshToken", tokens.RefreshToken, new CookieOptions
             {
@@ -166,6 +163,12 @@ namespace auth.webapi.Controllers
 
             var sessions = await _authService.GetUserSessionsAsync(userId);
             return Ok(sessions);
+        }
+
+        [HttpGet("test")]
+        public async Task<IActionResult> Test()
+        {
+            return Ok(new { message = "Test successful" });
         }
     }
 }

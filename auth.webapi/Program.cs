@@ -31,11 +31,6 @@ builder.Services.AddSwaggerDocumentation();
 var app = builder.Build();
 
 // Configure middleware
-// if (app.Environment.IsDevelopment())
-// {
-//     app.MapOpenApi();
-//     app.UseSwaggerUI();
-// }
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
