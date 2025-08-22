@@ -66,10 +66,11 @@ A .NET 9 Web API for authentication and authorization, featuring JWT-based authe
 
 ## Usage
 
+- Create an application via `/api/applicationclient/*` and use use the generated app ID and API key to make authorized api calls
+- Set app ID as the X-App-Id and API key as the X-Api-Key.
 - Register a new user via `/api/auth/register`
 - Login via `/api/auth/login` to receive JWT and refresh token
-- Manage application clients via `/api/applicationclient/*` endpoints
-- Use Swagger UI for API exploration
+- Use Swagger UI for API exploration and use a proper API client to test out authorized API calls.
 
 ## Architecture Overview
 
