@@ -14,5 +14,6 @@ namespace auth.webapi.Interfaces
 
         string HashApiKey(string rawKey);
         bool VerifyApiKey(string hashedKey, string providedKey);
+
     }
 }

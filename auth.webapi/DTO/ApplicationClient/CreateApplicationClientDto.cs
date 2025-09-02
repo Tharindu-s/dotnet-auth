@@ -8,5 +8,6 @@ namespace auth.webapi.DTO.ApplicationClient
     public class CreateApplicationClientDto
     {
         public required string Name { get; set; }
+
     }
 }

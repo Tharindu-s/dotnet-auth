@@ -31,7 +31,19 @@ namespace auth.webapi.Extentions
 
         public static void ConfigureJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
-            var signingKey = configuration["JWT:SigningKey"] ?? throw new InvalidOperationException("JWT SigningKey not found");
+            // Load RSA public key from PEM file (same as TokenService)
+            var privateKeyPath = Path.Combine(AppContext.BaseDirectory, "private_key.pem");
+            if (!File.Exists(privateKeyPath))
+                throw new InvalidOperationException($"RSA private key not found at {privateKeyPath}");
+
+            var privateKeyBytes = File.ReadAllBytes(privateKeyPath);
+            var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportRSAPrivateKey(privateKeyBytes, out _);
+            var keyId = configuration["JWT:KeyId"] ?? "dev-key";
+            var rsaKey = new Microsoft.IdentityModel.Tokens.RsaSecurityKey(rsa)
+            {
+                KeyId = keyId
+            };
 
             services.AddAuthentication(options =>
             {
@@ -41,7 +53,6 @@ namespace auth.webapi.Extentions
                 options.DefaultScheme =
                 options.DefaultSignInScheme =
                 options.DefaultSignOutScheme = JwtBearerDefaults.AuthenticationScheme;
-
             }).AddJwtBearer(options =>
             {
                 options.TokenValidationParameters = new TokenValidationParameters
@@ -51,7 +62,7 @@ namespace auth.webapi.Extentions
                     ValidateAudience = true,
                     ValidAudience = configuration["JWT:Audience"],
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(signingKey)),
+                    IssuerSigningKey = rsaKey,
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
                 };

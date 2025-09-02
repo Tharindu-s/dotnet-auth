@@ -409,27 +409,20 @@ Update `appsettings.json` with your configuration:
   "EmailSettings": {
     "From": "your-email@domain.com",
     "SmtpServer": "smtp.gmail.com",
-    "Port": "587",
     "Username": "your-email@domain.com",
-    "Password": "your-app-password"
   }
-}
-```
 
-### Running the API
-
-```bash
 # Navigate to project directory
+
 cd auth.webapi
 
-# Restore dependencies
-dotnet restore
 
-# Run migrations
-dotnet ef database update
+
 
 # Start the API
+
 dotnet run
+
 ```
 
 The API will be available at `https://localhost:5183`
@@ -447,8 +440,6 @@ Interactive API documentation is available at:
 
 ### Client Implementation
 
-1. **Store API credentials securely**: Never expose API keys in client-side code
-2. **Handle token refresh**: Implement automatic token refresh when access tokens expire
 3. **Secure cookie handling**: Ensure refresh tokens are handled securely
 4. **Error handling**: Implement proper error handling for all API responses
 5. **User agent**: Include meaningful user agent strings for session tracking

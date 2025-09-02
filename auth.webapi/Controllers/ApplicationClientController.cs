@@ -34,7 +34,5 @@ namespace auth.webapi.Controllers
                 RawApiKey = result.RawApiKey
             });
         }
-
-
     }
 }

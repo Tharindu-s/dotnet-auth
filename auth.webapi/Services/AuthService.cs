@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Security.Claims;
 using auth.webapi.Data;
 using auth.webapi.DTO.Auth;
@@ -9,7 +8,6 @@ using auth.webapi.DTO.Auth.Token;
 using auth.webapi.Helpers;
 using auth.webapi.Interfaces;
 using auth.webapi.Models;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -62,8 +60,6 @@ namespace auth.webapi.Services
 
             if (appClient == null)
                 throw new ApplicationClientAuthenticationException("Client application credentials do not match");
-
-
 
             _logger.LogInformation("Starting");
             var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Email == loginDto.Email.ToLower() && x.ApplicationClientId == appId);
@@ -171,7 +167,6 @@ namespace auth.webapi.Services
                 RefreshToken = newRefreshToken
             };
         }
-
         public async Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto, string ipAddress, string userAgent, Guid appId, string apiKey)
         {
             var hashedApiKey = _applicationClientService.HashApiKey(apiKey);

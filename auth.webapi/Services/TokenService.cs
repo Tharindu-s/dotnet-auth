@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 using auth.webapi.Interfaces;
 using auth.webapi.Models;
 using Microsoft.IdentityModel.Tokens;
@@ -15,19 +10,43 @@ namespace auth.webapi.Services
     public class TokenService : ITokenService
     {
         private readonly IConfigurationHelperService _config;
-        // SymmetricSecurityKey is used for symmetric encryption, which means the same key is used for both encryption and decryption.
-        private readonly SymmetricSecurityKey _key;
         private readonly string _jwtIssuer;
         private readonly string _jwtAudience;
+
+        // using asymmetric encryption and setting up jwks
+        private readonly string _privateKeyPath = Path.Combine(AppContext.BaseDirectory, "private_key.pem");
+        private readonly RSA _rsa;
+        private readonly RsaSecurityKey _rsaKey;
 
         public TokenService(IConfigurationHelperService config)
         {
             _config = config;
-            var signInKey = _config.GetRequiredConfig("JWT:SigningKey");
-            _key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signInKey));
             _jwtIssuer = _config.GetRequiredConfig("JWT:Issuer");
             _jwtAudience = _config.GetRequiredConfig("JWT:Audience");
+            var keyId = _config.GetRequiredConfig("JWT:KeyId");
+
+            // loading or generating RSA key
+            _rsa = LoadOrCreateRsaKey(_privateKeyPath);
+            _rsaKey = new RsaSecurityKey(_rsa)
+            {
+                KeyId = keyId
+            };
         }
+
+        private RSA LoadOrCreateRsaKey(string path)
+        {
+            if (!File.Exists(path))
+            {
+                using var rsaGen = RSA.Create(2048);
+                File.WriteAllBytes(path, rsaGen.ExportRSAPrivateKey());
+            }
+
+            var privateKeyBytes = File.ReadAllBytes(path);
+            var rsa = RSA.Create();
+            rsa.ImportRSAPrivateKey(privateKeyBytes, out _);
+            return rsa;
+        }
+
         public string CreateRefreshToken()
         {
             var randomBytes = new byte[64];
@@ -51,7 +70,7 @@ namespace auth.webapi.Services
         new Claim(JwtRegisteredClaimNames.Iat, DateTime.UtcNow.ToString(), ClaimValueTypes.DateTime)
     };
 
-            var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);
+            var creds = new SigningCredentials(_rsaKey, SecurityAlgorithms.RsaSha256);
 
             // Token descriptor with expiration, claims, signing credentials, and issuer/audience
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -72,12 +91,28 @@ namespace auth.webapi.Services
             return tokenHandler.WriteToken(token);
         }
 
+        public object GetJwks()
+        {
+            var parameters = _rsa.ExportParameters(false); // public key only
+            var jwk = new
+            {
+                kty = "RSA",
+                use = "sig",
+                kid = _rsaKey.KeyId,
+                alg = "RS256",
+                n = Base64UrlEncoder.Encode(parameters.Modulus),
+                e = Base64UrlEncoder.Encode(parameters.Exponent)
+            };
+
+            return new { keys = new[] { jwk } };
+        }
+
         public ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
         {
             var tokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = _key,
+                IssuerSigningKey = _rsaKey,
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateLifetime = false,
@@ -92,7 +127,7 @@ namespace auth.webapi.Services
                 var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
 
                 if (securityToken is not JwtSecurityToken jwtToken ||
-                    !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha512, StringComparison.InvariantCultureIgnoreCase)
+                    !jwtToken.Header.Alg.Equals(SecurityAlgorithms.RsaSha256, StringComparison.InvariantCultureIgnoreCase)
 )
                 {
                     throw new SecurityTokenException("Invalid token");

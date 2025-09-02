@@ -12,8 +12,8 @@ using auth.webapi.Data;
 namespace auth.webapi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250805163633_RefreshTokenSchemaChange")]
-    partial class RefreshTokenSchemaChange
+    [Migration("20250831131951_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

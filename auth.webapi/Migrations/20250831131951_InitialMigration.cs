@@ -9,7 +9,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace auth.webapi.Migrations
 {
     /// <inheritdoc />
-    public partial class NewMigration : Migration
+    public partial class InitialMigration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -200,6 +200,12 @@ namespace auth.webapi.Migrations
                 {
                     table.PrimaryKey("PK_RefreshTokens", x => x.Id);
                     table.ForeignKey(
+                        name: "FK_RefreshTokens_ApplicationClient_ApplicationClientId",
+                        column: x => x.ApplicationClientId,
+                        principalTable: "ApplicationClient",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
                         name: "FK_RefreshTokens_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
@@ -257,6 +263,11 @@ namespace auth.webapi.Migrations
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RefreshTokens_ApplicationClientId",
+                table: "RefreshTokens",
+                column: "ApplicationClientId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RefreshTokens_UserId",
