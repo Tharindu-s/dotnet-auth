@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using auth.webapi.Data;
 using auth.webapi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -31,11 +32,17 @@ namespace auth.webapi.Extentions
 
         public static void ConfigureJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
-            // Load RSA public key from PEM file (same as TokenService)
+            // Check if the key is there and load it
             var privateKeyPath = Path.Combine(AppContext.BaseDirectory, "private_key.pem");
             if (!File.Exists(privateKeyPath))
-                throw new InvalidOperationException($"RSA private key not found at {privateKeyPath}");
+            {
+                var rsaGen = RSA.Create(2048); // new 2048 bit RSA key
+                var privateKey = rsaGen.ExportRSAPrivateKey();
+                File.WriteAllBytes(privateKeyPath, privateKey); // save the private key
+                Console.WriteLine($"Generated new RSA private key at {privateKeyPath}");
+            }
 
+            // load the key
             var privateKeyBytes = File.ReadAllBytes(privateKeyPath);
             var rsa = System.Security.Cryptography.RSA.Create();
             rsa.ImportRSAPrivateKey(privateKeyBytes, out _);
