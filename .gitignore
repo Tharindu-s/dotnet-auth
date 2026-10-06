@@ -49,3 +49,7 @@ _ReSharper.*
 
 ## Ignore EF Core Migrations snapshots (optional)
 Migrations/*Snapshot.cs
+
+.vs
+secrets.json 
+private_key.pem
