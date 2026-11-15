@@ -63,7 +63,8 @@ namespace auth.webapi.Helpers
 
     public class AccountLockedException : AppException
     {
-        public AccountLockedException() : base("Too many failed login attempts. The account is locked, try again later.") { }
+        // Covers both lockout after failed passwords and a lock set by an admin
+        public AccountLockedException() : base("This account is locked. Try again later.") { }
         public AccountLockedException(string message) : base(message) { }
     }
 
@@ -77,6 +78,32 @@ namespace auth.webapi.Helpers
     {
         public InvalidTokenException() : base("The access token is invalid or malformed.") { }
         public InvalidTokenException(string message) : base(message) { }
+    }
+
+    public class AppForbiddenException : AppException
+    {
+        public AppForbiddenException() : base("You don't have access to this.") { }
+        public AppForbiddenException(string message) : base(message) { }
+    }
+
+    public class PasswordChangeRequiredException : AppException
+    {
+        public PasswordChangeRequiredException() : base("Change your password before using the admin console.") { }
+    }
+
+    public class PasswordChangeFailedException : AppException
+    {
+        public PasswordChangeFailedException(string message) : base(message) { }
+    }
+
+    public class RegistrationDisabledException : AppException
+    {
+        public RegistrationDisabledException() : base("Sign-ups are turned off for this app.") { }
+    }
+
+    public class ApplicationClientNotFoundException : AppException
+    {
+        public ApplicationClientNotFoundException() : base("App not found.") { }
     }
 
 

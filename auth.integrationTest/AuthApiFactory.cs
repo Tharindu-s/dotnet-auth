@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using auth.webapi.Data;
 using auth.webapi.Interfaces;
+using auth.webapi.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -10,12 +12,15 @@ using Testcontainers.PostgreSql;
 
 namespace auth.integrationTest
 {
-    // Runs the real app against a throwaway Postgres container, with migrations applied.
+    // Runs the real app against a throwaway Postgres container. The app applies migrations and creates
+    // the Argus app and its admin on startup, as in docker-compose.
     // Shared by every test class in the "api" collection; tests isolate themselves by creating their own app client.
     public class AuthApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
-        public const string AdminKey = "integration-admin-key";
         public const string Issuer = "https://auth.integration.test";
+        public const string ArgusOrigin = "https://argus.integration.test";
+        public const string AdminEmail = "admin@argus.integration.test";
+        public const string AdminPassword = "Adm1n-Passw0rd!";
 
         private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine").Build();
 
@@ -33,7 +38,10 @@ namespace auth.integrationTest
             builder.UseSetting("JWT:Audience", Issuer);
             builder.UseSetting("JWT:PrivateKey", _signingKeyPem);
             builder.UseSetting("Security:ApiKeySalt", "integration-salt");
-            builder.UseSetting("Security:AdminApiKey", AdminKey);
+            builder.UseSetting("Database:MigrateOnStartup", "true");
+            builder.UseSetting("Argus:AllowedOrigins:0", ArgusOrigin);
+            builder.UseSetting("Argus:AdminEmail", AdminEmail);
+            builder.UseSetting("Argus:AdminPassword", AdminPassword);
             builder.UseSetting("RateLimiting:Credentials:PermitLimit", "10000");
             builder.UseSetting("RateLimiting:Refresh:PermitLimit", "10000");
 
@@ -58,10 +66,21 @@ namespace auth.integrationTest
             await action(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
         }
 
+        public async Task WithUsersAsync(Func<UserManager<AppUser>, Task> action)
+        {
+            await using var scope = Services.CreateAsyncScope();
+            await action(scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>());
+        }
+
         public async Task InitializeAsync()
         {
             await _postgres.StartAsync();
-            await WithDbAsync(db => db.Database.MigrateAsync());
+
+            // Building the host runs the startup tasks: migrations, then the Argus app and admin.
+            // The forced password change has its own test, so the shared admin skips it.
+            await WithDbAsync(db => db.Users
+                .Where(u => u.Email == AdminEmail)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.MustChangePassword, false)));
         }
 
         async Task IAsyncLifetime.DisposeAsync()

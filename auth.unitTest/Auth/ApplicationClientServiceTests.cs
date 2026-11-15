@@ -122,5 +122,112 @@ namespace auth.unitTest.Auth
 
             await Assert.ThrowsAsync<ApplicationClientAuthenticationException>(() => _t.Apps.AuthenticateAsync(created.Id, null, "http://localhost:5173"));
         }
+
+        // Management
+
+        [Fact]
+        public async Task List_ReturnsAppsWithUserCountsButNotTheArgusApp()
+        {
+            await _t.Bootstrapper.RunAsync();
+            var app = await _t.CreateAppAsync("Notes");
+            await _t.Auth.RegisterUserAsync(new() { FullName = "Jane", Email = "jane@example.com", City = "Colombo", Password = "Passw0rd!" }, app, "127.0.0.1", "test");
+
+            var apps = await _t.Apps.ListAsync();
+
+            var listed = Assert.Single(apps);
+            Assert.Equal("Notes", listed.Name);
+            Assert.Equal(1, listed.UserCount);
+            Assert.Equal(1, listed.ActiveSessionCount);
+        }
+
+        [Fact]
+        public async Task ArgusApp_CannotBeReadChangedOrDeleted()
+        {
+            await _t.Bootstrapper.RunAsync();
+            var argusId = (await _t.Db.ApplicationClient.SingleAsync(a => a.IsSystem)).Id;
+
+            await Assert.ThrowsAsync<ApplicationClientNotFoundException>(() => _t.Apps.GetAsync(argusId));
+            await Assert.ThrowsAsync<ApplicationClientNotFoundException>(() => _t.Apps.DeleteAsync(argusId));
+            await Assert.ThrowsAsync<ApplicationClientNotFoundException>(() => _t.Apps.RotateApiKeyAsync(argusId));
+            await Assert.ThrowsAsync<ApplicationClientNotFoundException>(() =>
+                _t.Apps.UpdateAsync(argusId, new() { Name = "Mine now", AllowedOrigins = new() { "https://evil.example.com" } }));
+        }
+
+        [Fact]
+        public async Task Update_ChangesSettings()
+        {
+            var created = await _t.Apps.RegisterApplication(new() { Name = "SPA", IsPublic = true, AllowedOrigins = new() { "http://localhost:5173" } });
+
+            var updated = await _t.Apps.UpdateAsync(created.Id, new()
+            {
+                Name = " Notes ",
+                Audience = "notes-api",
+                AllowedOrigins = new() { "https://notes.example.com/", "" },
+                RegistrationEnabled = false
+            });
+
+            Assert.Equal("Notes", updated.Name);
+            Assert.Equal("notes-api", updated.Audience);
+            Assert.Equal(new[] { "https://notes.example.com" }, updated.AllowedOrigins);
+            Assert.False(updated.RegistrationEnabled);
+            Assert.True(updated.IsPublic);
+        }
+
+        [Fact]
+        public async Task Update_BlankAudience_FallsBackToTheAppId()
+        {
+            var created = await _t.Apps.RegisterApplication(new() { Name = "App", Audience = "notes-api" });
+
+            var updated = await _t.Apps.UpdateAsync(created.Id, new() { Name = "App", Audience = " " });
+
+            Assert.Equal(created.Id.ToString(), updated.Audience);
+        }
+
+        [Fact]
+        public async Task Update_PublicAppWithoutOrigins_Throws()
+        {
+            var created = await _t.Apps.RegisterApplication(new() { Name = "SPA", IsPublic = true, AllowedOrigins = new() { "http://localhost:5173" } });
+
+            await Assert.ThrowsAsync<AppException>(() => _t.Apps.UpdateAsync(created.Id, new() { Name = "SPA", AllowedOrigins = new() }));
+        }
+
+        [Fact]
+        public async Task RotateApiKey_OldKeyStopsWorking_NewKeyWorks()
+        {
+            var created = await _t.Apps.RegisterApplication(new() { Name = "Server" });
+
+            var newKey = await _t.Apps.RotateApiKeyAsync(created.Id);
+
+            Assert.NotEqual(created.RawApiKey, newKey);
+            await Assert.ThrowsAsync<ApplicationClientAuthenticationException>(() => _t.Apps.AuthenticateAsync(created.Id, created.RawApiKey, null));
+            Assert.Equal(created.Id, (await _t.Apps.AuthenticateAsync(created.Id, newKey, null)).Id);
+        }
+
+        [Fact]
+        public async Task RotateApiKey_PublicApp_Throws()
+        {
+            var created = await _t.Apps.RegisterApplication(new() { Name = "SPA", IsPublic = true, AllowedOrigins = new() { "http://localhost:5173" } });
+
+            await Assert.ThrowsAsync<AppException>(() => _t.Apps.RotateApiKeyAsync(created.Id));
+        }
+
+        [Fact]
+        public async Task Delete_RemovesTheAppWithItsUsersAndTokens()
+        {
+            var app = await _t.CreateAppAsync();
+            await _t.Auth.RegisterUserAsync(new() { FullName = "Jane", Email = "jane@example.com", City = "Colombo", Password = "Passw0rd!" }, app, "127.0.0.1", "test");
+
+            await _t.Apps.DeleteAsync(app.Id);
+
+            Assert.False(await _t.Db.ApplicationClient.AnyAsync(a => a.Id == app.Id));
+            Assert.False(await _t.Db.Users.AnyAsync());
+            Assert.False(await _t.Db.RefreshTokens.AnyAsync());
+        }
+
+        [Fact]
+        public async Task Delete_Unknown_Throws()
+        {
+            await Assert.ThrowsAsync<ApplicationClientNotFoundException>(() => _t.Apps.DeleteAsync(Guid.NewGuid()));
+        }
     }
 }

@@ -2,10 +2,10 @@ import type { QueryClient } from '@tanstack/react-query'
 import { refreshAccessToken } from '@/lib/api'
 import { broadcastAuth, onAuthMessage } from '@/lib/authChannel'
 import { getTokenExpiry } from '@/lib/jwt'
-import type { AuthResponse } from '@/lib/types'
+import type { CurrentUser } from '@/lib/types'
 import { useAuthStore } from '@/stores/auth'
 import * as authApi from './api'
-import type { LoginInput, RegisterInput } from './schemas'
+import type { LoginInput } from './schemas'
 
 /** On page load: trade the refresh cookie (if any) for an access token, then load the profile. */
 export async function restoreSession() {
@@ -19,12 +19,15 @@ export async function restoreSession() {
   }
 }
 
+/** Logs in, then loads the full profile (roles, mustChangePassword) before the session starts */
 export async function signIn(input: LoginInput) {
-  startSession(await authApi.login(input))
+  const { accessToken } = await authApi.login(input)
+  startSession(await authApi.fetchMe(accessToken), accessToken)
 }
 
-export async function signUp(input: RegisterInput) {
-  startSession(await authApi.register(input))
+/** Reloads the profile, for example after the password change clears mustChangePassword */
+export async function reloadUser() {
+  useAuthStore.getState().setUser(await authApi.fetchMe())
 }
 
 export async function signOut(queryClient: QueryClient) {
@@ -37,7 +40,7 @@ export async function signOut(queryClient: QueryClient) {
   }
 }
 
-function startSession({ accessToken, ...user }: AuthResponse) {
+function startSession(user: CurrentUser, accessToken: string) {
   useAuthStore.getState().setSession(user, accessToken)
   broadcastAuth({ type: 'login' })
 }

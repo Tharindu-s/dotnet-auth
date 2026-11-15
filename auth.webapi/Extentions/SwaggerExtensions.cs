@@ -44,7 +44,7 @@ public static class SwaggerExtensions
     }
 }
 
-// Adds header fields to Swagger UI for endpoints that need the app or admin headers
+// Adds header fields to Swagger UI for endpoints that need the app headers
 public class RequiredHeadersOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
@@ -56,9 +56,6 @@ public class RequiredHeadersOperationFilter : IOperationFilter
             AddHeader(operation, RequireApplicationClientAttribute.AppIdHeader, "Application client ID");
             AddHeader(operation, RequireApplicationClientAttribute.ApiKeyHeader, "Application client API key (not used by public clients)", required: false);
         }
-
-        if (metadata.OfType<RequireAdminKeyAttribute>().Any())
-            AddHeader(operation, RequireAdminKeyAttribute.AdminKeyHeader, "Value of Security:AdminApiKey");
     }
 
     private static void AddHeader(OpenApiOperation operation, string name, string description, bool required = true)

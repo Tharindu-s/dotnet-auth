@@ -1,32 +1,26 @@
 import type { ComponentProps, ReactNode } from 'react'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 
 interface FormFieldProps extends ComponentProps<typeof Input> {
   id: string
   label: string
   error?: string
-  hint?: ReactNode
+  description?: ReactNode
 }
 
-/** Label, input and error message, wired up for screen readers */
-export function FormField({ id, label, error, hint, ...inputProps }: FormFieldProps) {
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
+/** shadcn Field + Input, with the label, description and error wired up for screen readers */
+export function FormField({ id, label, error, description, ...inputProps }: FormFieldProps) {
+  const describedBy = error ? `${id}-error` : description ? `${id}-description` : undefined
   return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...inputProps} />
+    <Field data-invalid={error ? true : undefined}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Input id={id} aria-invalid={error ? true : undefined} aria-describedby={describedBy} className="h-10 bg-white" {...inputProps} />
       {error ? (
-        <p id={`${id}-error`} className="text-sm text-destructive">
-          {error}
-        </p>
+        <FieldError id={`${id}-error`}>{error}</FieldError>
       ) : (
-        hint && (
-          <div id={`${id}-hint`} className="text-sm text-muted-foreground">
-            {hint}
-          </div>
-        )
+        description && <FieldDescription id={`${id}-description`}>{description}</FieldDescription>
       )}
-    </div>
+    </Field>
   )
 }

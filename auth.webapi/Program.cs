@@ -14,6 +14,7 @@ builder.Services.ConfigureJwtAuthentication();
 builder.Services.ConfigureCors();
 builder.Services.ConfigureRateLimiting();
 builder.Services.ConfigureForwardedHeaders();
+builder.Services.ConfigureArgus();
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
@@ -22,6 +23,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IApplicationClientService, ApplicationClientService>();
+builder.Services.AddScoped<IAppUserAdminService, AppUserAdminService>();
 builder.Services.AddScoped<IConfigurationHelperService, ConfigurationHelper>();
 
 // Swagger/OpenAPI
@@ -33,6 +35,9 @@ var app = builder.Build();
 
 // Load the signing key now, so a missing key fails at startup instead of on the first login
 app.Services.GetRequiredService<ISigningKeyService>();
+
+// Apply migrations if Database:MigrateOnStartup is set, then create the Argus app and first admin if needed
+await app.Services.RunStartupTasksAsync();
 
 // Configure middleware
 app.UseForwardedHeaders();

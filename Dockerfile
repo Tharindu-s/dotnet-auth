@@ -23,6 +23,13 @@ WORKDIR /app
 
 COPY --from=build /app/publish ./
 
+# Writable folder for a generated signing key (JWT__PrivateKeyPath=/app/data/signing-key.pem).
+# docker-compose mounts a volume here; a new named volume inherits this ownership.
+RUN mkdir -p /app/data && chown $APP_UID /app/data
+
+# Run as the image's non-root user
+USER $APP_UID
+
 EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "auth.webapi.dll"]

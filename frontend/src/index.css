@@ -2,23 +2,21 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
-@import "@fontsource-variable/schibsted-grotesk";
 
 /*
-  Look and feel modeled on a clean editorial landing style: white canvas, near-black ink,
-  pill buttons, tight grotesk headlines, and grainy purple / pink / coral color blocks.
+  Soft console look: a light gray backdrop warmed by a peach gradient in the corner, the app in a
+  large rounded frame, white cards with gentle shadows, pill-shaped navigation and dark pill buttons.
 */
 
 @theme inline {
     --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
-    --font-heading: 'Schibsted Grotesk Variable', var(--font-sans);
+    --font-heading: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
 
     --color-ink: var(--foreground);
     --color-surface: var(--surface);
-    --color-violet: var(--brand-violet);
-    --color-pink: var(--brand-pink);
-    --color-coral: var(--brand-coral);
+    --color-frame: var(--frame);
     --color-argus: var(--brand-argus);
+    --color-peach: var(--brand-peach);
 
     --color-ring: var(--ring);
     --color-input: var(--input);
@@ -39,6 +37,15 @@
     --color-foreground: var(--foreground);
     --color-background: var(--background);
 
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -46,35 +53,47 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.4);
     --radius-4xl: calc(var(--radius) * 3);
+
+    --shadow-soft: 0 1px 2px rgb(16 18 24 / 0.04), 0 8px 24px -12px rgb(16 18 24 / 0.12);
 }
 
 :root {
     --background: #ffffff;
-    --foreground: #121211;
-    --surface: #f4f6f6;
-    --brand-violet: #934bf0;
-    --brand-pink: #fa7fd8;
-    --brand-coral: #fa7465;
+    --foreground: #15171c;
+    /* Inside the app frame */
+    --frame: #f6f6f7;
+    --surface: #f1f2f4;
     /* Blue from the Argus logo's center dot */
     --brand-argus: #2f5bff;
+    --brand-peach: #f6926f;
 
     --card: #ffffff;
-    --card-foreground: #121211;
+    --card-foreground: #15171c;
     --popover: #ffffff;
-    --popover-foreground: #121211;
-    --primary: #121211;
+    --popover-foreground: #15171c;
+    --primary: #15171c;
     --primary-foreground: #ffffff;
-    --secondary: #f4f6f6;
-    --secondary-foreground: #121211;
-    --muted: #f4f6f6;
-    --muted-foreground: #5f6363;
-    --accent: #eceff0;
-    --accent-foreground: #121211;
+    --secondary: #eef0f2;
+    --secondary-foreground: #15171c;
+    --muted: #eef0f2;
+    --muted-foreground: #6b7079;
+    --accent: #eceef1;
+    --accent-foreground: #15171c;
     --destructive: #d9342b;
-    --border: #e4e8e8;
-    --input: #dfe3e3;
-    --ring: #934bf0;
-    --radius: 0.625rem;
+    --border: #e6e8eb;
+    --input: #e1e4e8;
+    --ring: #9aa3b2;
+    --radius: 0.75rem;
+
+    /* Same as the frame, so the phone drawer is opaque */
+    --sidebar: #f6f6f7;
+    --sidebar-foreground: #4b505a;
+    --sidebar-primary: #15171c;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #ffffff;
+    --sidebar-accent-foreground: #15171c;
+    --sidebar-border: #e6e8eb;
+    --sidebar-ring: #9aa3b2;
 }
 
 @layer base {
@@ -87,32 +106,23 @@
   html {
     @apply font-sans;
   }
-  h1, h2, h3 {
-    @apply font-heading;
-  }
 }
 
 @layer components {
-  /* Large tight headline, as in the reference hero */
-  .display-title {
-    @apply font-heading font-normal text-ink;
-    letter-spacing: -0.05em;
-    line-height: 1.02;
+  /* The page behind the app frame: light gray with a warm peach glow in the bottom-right corner */
+  .app-backdrop {
+    background-color: #e4e6ea;
+    background-image:
+      radial-gradient(70rem 45rem at 110% 115%, rgb(246 128 92 / 0.95), transparent 62%),
+      radial-gradient(50rem 32rem at 75% 125%, rgb(250 186 155 / 0.85), transparent 70%),
+      linear-gradient(180deg, #e9eaee, #dfe1e6);
   }
 
-  /* Film grain over the color blocks */
-  .grain {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-  }
-  .grain::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.5;
-    mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Soft four-point glow behind the Argus mark on welcome screens */
+  .mark-glow {
+    background:
+      radial-gradient(closest-side, rgb(246 146 111 / 0.45), transparent),
+      radial-gradient(closest-side, rgb(201 170 240 / 0.5), transparent);
+    filter: blur(18px);
   }
 }

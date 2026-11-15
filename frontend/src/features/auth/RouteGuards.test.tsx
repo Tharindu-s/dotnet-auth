@@ -24,4 +24,18 @@ describe('route guards', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   })
+
+  it('holds an admin on /change-password until the initial password is replaced', async () => {
+    useAuthStore.getState().setSession({ ...user, mustChangePassword: true }, 'token')
+    const { router } = renderApp('/apps/new')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/change-password'))
+  })
+
+  it('shows no access to a user without the Admin role', async () => {
+    useAuthStore.getState().setSession({ ...user, roles: ['User'] }, 'token')
+    renderApp('/')
+
+    expect(await screen.findByText('No access.')).toBeInTheDocument()
+  })
 })

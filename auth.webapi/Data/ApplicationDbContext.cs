@@ -38,9 +38,15 @@ namespace auth.webapi.Data
                 token.HasIndex(t => t.FamilyId);
             });
 
-            builder.Entity<ApplicationClient>()
-                .Property(a => a.Audience)
-                .HasMaxLength(200);
+            builder.Entity<ApplicationClient>(app =>
+            {
+                app.Property(a => a.Audience).HasMaxLength(200);
+
+                // At most one system (Argus) app, even if two replicas start at the same time
+                app.HasIndex(a => a.IsSystem)
+                    .IsUnique()
+                    .HasFilter("\"IsSystem\"");
+            });
 
             List<IdentityRole> roles = new List<IdentityRole>{
                 new IdentityRole{

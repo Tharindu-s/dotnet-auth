@@ -1,46 +1,55 @@
+import { MonitorSmartphone } from 'lucide-react'
 import { toast } from 'sonner'
-import { PageHeader } from '@/components/AppLayout'
+import { Page, PageHeader } from '@/components/AppLayout'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getErrorMessage } from '@/lib/errors'
+import { formatDateTime } from '@/lib/format'
 import type { Session } from '@/lib/types'
 import { describeDevice } from './describeDevice'
 import { useRevokeSession, useSessions } from './queries'
-
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 export function SessionsPage() {
   const sessions = useSessions()
 
   return (
-    <>
+    <Page>
       <PageHeader
         tabTitle="Sessions"
-        eyebrow="Security"
-        title="Active sessions."
-        description="Every device that is signed in to your account. Revoke any you don't recognize."
+        title="Your sessions"
+        description="Every device signed in to your admin account. Revoke any you don't recognize."
       />
       <Card>
         <CardContent>
           {sessions.isPending ? (
             <div className="grid gap-2" aria-label="Loading sessions">
-              <Skeleton className="h-10 bg-white" />
-              <Skeleton className="h-10 bg-white" />
+              <Skeleton className="h-12" />
+              <Skeleton className="h-12" />
             </div>
           ) : sessions.isError ? (
             <Alert variant="destructive">
               <AlertDescription>{getErrorMessage(sessions.error)}</AlertDescription>
             </Alert>
+          ) : sessions.data.length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <MonitorSmartphone />
+                </EmptyMedia>
+                <EmptyTitle>No active sessions</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <SessionsTable sessions={sessions.data} />
           )}
         </CardContent>
       </Card>
-    </>
+    </Page>
   )
 }
 
@@ -72,12 +81,12 @@ function SessionsTable({ sessions }: { sessions: Session[] }) {
             <TableCell>
               <div className="flex items-center gap-2">
                 <span title={session.device ?? undefined}>{describeDevice(session.device)}</span>
-                {session.isCurrent && <Badge className="rounded-full bg-ink text-white">This device</Badge>}
+                {session.isCurrent && <Badge>This device</Badge>}
               </div>
             </TableCell>
             <TableCell className="hidden sm:table-cell">{session.ipAddress}</TableCell>
-            <TableCell className="hidden md:table-cell">{dateFormat.format(new Date(session.issuedAt))}</TableCell>
-            <TableCell className="hidden md:table-cell">{dateFormat.format(new Date(session.expiresAt))}</TableCell>
+            <TableCell className="hidden md:table-cell">{formatDateTime(session.issuedAt)}</TableCell>
+            <TableCell className="hidden md:table-cell">{formatDateTime(session.expiresAt)}</TableCell>
             <TableCell className="text-right">
               {session.isCurrent ? (
                 <span className="hidden text-sm whitespace-nowrap text-muted-foreground sm:inline">Use Log out</span>
@@ -85,7 +94,7 @@ function SessionsTable({ sessions }: { sessions: Session[] }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="bg-white"
+                  className="rounded-full bg-white"
                   disabled={revoke.isPending && revoke.variables === session.tokenId}
                   onClick={() => onRevoke(session)}
                 >

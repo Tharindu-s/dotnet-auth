@@ -4,6 +4,7 @@ using auth.webapi.Extentions;
 using auth.webapi.Interfaces;
 using auth.webapi.Models;
 using auth.webapi.Services;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -20,10 +21,14 @@ namespace auth.unitTest
     {
         public const string Issuer = "https://auth.test";
         public const string AuthAudience = "https://auth.test";
+        public const string ArgusOrigin = "https://argus.test";
+        public const string AdminEmail = "admin@argus.test";
 
         private static readonly RsaSecurityKey SharedKey = CreateKey();
 
         private readonly SqliteConnection _connection;
+        private readonly bool _ownsConnection;
+        private readonly Dictionary<string, string?> _settings;
         private readonly ServiceProvider _root;
         private readonly List<AsyncServiceScope> _scopes = new();
 
@@ -32,19 +37,28 @@ namespace auth.unitTest
         public IAuthService Auth => Get<IAuthService>();
         public ITokenService Tokens => Get<ITokenService>();
         public IApplicationClientService Apps => Get<IApplicationClientService>();
+        public IAppUserAdminService Admin => Get<IAppUserAdminService>();
+        public ArgusBootstrapper Bootstrapper => Get<ArgusBootstrapper>();
+        public UserManager<AppUser> Users => Get<UserManager<AppUser>>();
 
-        private TestServices()
+        private TestServices(Dictionary<string, string?>? settings, SqliteConnection? sharedConnection = null)
         {
-            _connection = new SqliteConnection("DataSource=:memory:");
-            _connection.Open();
+            _settings = settings ?? new();
+            _ownsConnection = sharedConnection == null;
+            _connection = sharedConnection ?? new SqliteConnection("DataSource=:memory:");
+            if (_ownsConnection)
+                _connection.Open();
 
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["JWT:Issuer"] = Issuer,
                     ["JWT:Audience"] = AuthAudience,
-                    ["Security:ApiKeySalt"] = "unit-test-salt"
+                    ["Security:ApiKeySalt"] = "unit-test-salt",
+                    ["Argus:AllowedOrigins:0"] = ArgusOrigin,
+                    ["Argus:AdminEmail"] = AdminEmail
                 })
+                .AddInMemoryCollection(_settings)
                 .Build();
 
             var services = new ServiceCollection();
@@ -58,16 +72,29 @@ namespace auth.unitTest
             services.AddScoped<ITokenService, TokenService>();
             services.AddScoped<IApplicationClientService, ApplicationClientService>();
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IAppUserAdminService, AppUserAdminService>();
+            services.ConfigureArgus();
             services.AddSingleton(Email.Object);
 
             _root = services.BuildServiceProvider();
         }
 
-        public static async Task<TestServices> CreateAsync()
+        // settings override the defaults above, such as ["Argus:AdminPassword"] = "..."
+        public static async Task<TestServices> CreateAsync(Dictionary<string, string?>? settings = null)
         {
-            var services = new TestServices();
+            var services = new TestServices(settings);
             await services.Db.Database.EnsureCreatedAsync();
             return services;
+        }
+
+        // Another container over the same database with extra settings, as if the service restarted with a changed config.
+        // Dispose it before this one.
+        public Task<TestServices> WithSettingsAsync(Dictionary<string, string?> settings)
+        {
+            var merged = new Dictionary<string, string?>(_settings);
+            foreach (var (key, value) in settings)
+                merged[key] = value;
+            return Task.FromResult(new TestServices(merged, _connection));
         }
 
         public T Get<T>() where T : notnull
@@ -79,9 +106,9 @@ namespace auth.unitTest
 
         public RsaSecurityKey SigningKey => SharedKey;
 
-        public async Task<ApplicationClient> CreateAppAsync(string name = "Test App", string? audience = null)
+        public async Task<ApplicationClient> CreateAppAsync(string name = "Test App", string? audience = null, bool registrationEnabled = true)
         {
-            var created = await Apps.RegisterApplication(new() { Name = name, Audience = audience });
+            var created = await Apps.RegisterApplication(new() { Name = name, Audience = audience, RegistrationEnabled = registrationEnabled });
             return await Db.ApplicationClient.AsNoTracking().SingleAsync(a => a.Id == created.Id);
         }
 
@@ -90,7 +117,8 @@ namespace auth.unitTest
             foreach (var scope in _scopes)
                 await scope.DisposeAsync();
             await _root.DisposeAsync();
-            await _connection.DisposeAsync();
+            if (_ownsConnection)
+                await _connection.DisposeAsync();
         }
 
         private static RsaSecurityKey CreateKey()

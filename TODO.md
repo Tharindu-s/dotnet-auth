@@ -1,6 +1,6 @@
 # TODO
 
-Sections are in priority order. Sections 2–6 are done; sections 1 and 7 are still open.
+Sections are in priority order. Sections 2–6 and 8 are done; sections 1 and 7 are still open.
 
 ## 1. Secrets
 
@@ -100,7 +100,21 @@ The leaked credentials are dead, and the history was rewritten with `git filter-
 
 ## 7. Later / optional
 
+- [ ] **More than one admin.** Only the first Argus admin is created; add a page to invite or create more.
+- [ ] **Code-split the console.** The production bundle is one ~820 kB chunk; lazy-load the app detail and new-app routes.
+
 - [ ] **Password reset and email confirmation.** Identity's token providers are already registered with a 2-hour lifetime, but nothing uses them yet.
 - [ ] **OpenID discovery document** at `/.well-known/openid-configuration`, so downstream ASP.NET services can validate tokens by setting `options.Authority`. Without it, a second service has to fetch the JWKS by hand (usually once, at startup), fails to start if the auth service is down, and doesn't pick up new keys. Do this as soon as a second service needs to validate tokens.
 - [ ] **Signing key rotation.** Publish both the old and new keys in the JWKS during a rollover.
 - [ ] **CQRS**, but only if an admin or reporting side is added, such as login analytics per app or audit logs. It isn't worth the overhead for the current endpoints.
+
+## 8. Argus admin console and Docker Compose
+
+- [x] `docker-compose.yml` with Postgres, the API and Argus, plus `.env.example`. Migrations run on startup, the signing key is generated into a volume, and SMTP is optional.
+- [x] The service creates its own Argus app (public, sign-ups off, hidden from the apps API) and a first admin on startup. The admin must change the initial password; `Argus:ResetAdminPassword` recovers a locked-out admin.
+- [x] Admin endpoints check the database: an Argus user with the `Admin` role. Replaced `X-Admin-Key` and `POST /api/application-client`.
+- [x] `/api/apps`: list, create, edit, rotate key, delete, plus each app's users (search, lock, unlock, delete) and sessions (revoke). Apps can turn sign-ups off.
+- [x] `POST /api/auth/change-password`, which signs out the user's other sessions.
+- [x] Argus reads its app ID from `GET /api/argus/config`, so nothing is baked into the frontend build.
+- [x] Argus UI rebuilt from shadcn/ui components: sidebar shell, home with an apps panel, app detail tabs, dialogs for destructive actions.
+- [x] Removed the public `GET /api/auth/test` endpoint and the stray `auth.webapi.sln` and `auth.unitTest.sln`.

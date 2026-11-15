@@ -9,5 +9,6 @@ namespace auth.webapi.DTO.Auth
         public required string City { get; set; }
         public required Guid AppId { get; set; }
         public required IList<string> Roles { get; set; }
+        public bool MustChangePassword { get; set; }
     }
 }

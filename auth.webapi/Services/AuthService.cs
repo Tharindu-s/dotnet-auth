@@ -51,8 +51,47 @@ namespace auth.webapi.Services
                 Email = user.Email!,
                 City = user.City!,
                 AppId = user.ApplicationClientId,
-                Roles = roles
+                Roles = roles,
+                MustChangePassword = user.MustChangePassword
             };
+        }
+
+        public async Task ChangePasswordAsync(string userId, ChangePasswordDto dto, string? currentRefreshToken)
+        {
+            var user = await _userManager.FindByIdAsync(userId) ?? throw new UserNotFoundException();
+
+            if (dto.CurrentPassword == dto.NewPassword)
+                throw new PasswordChangeFailedException("Choose a password that's different from the current one.");
+
+            // ChangePasswordAsync saves the user only if it succeeds, so the flag is cleared only then
+            user.MustChangePassword = false;
+            var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+            if (!result.Succeeded)
+            {
+                var message = result.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.PasswordMismatch))
+                    ? "The current password is incorrect."
+                    : string.Join(" ", result.Errors.Select(e => e.Description));
+                throw new PasswordChangeFailedException(message);
+            }
+
+            // Anyone else holding a session (perhaps someone who knew the old password) is signed out
+            Guid? currentFamily = null;
+            if (!string.IsNullOrEmpty(currentRefreshToken))
+            {
+                var hash = _tokenService.HashRefreshToken(currentRefreshToken);
+                currentFamily = await _context.RefreshTokens
+                    .Where(rt => rt.TokenHash == hash && rt.UserId == userId)
+                    .Select(rt => (Guid?)rt.FamilyId)
+                    .FirstOrDefaultAsync();
+            }
+
+            var others = _context.RefreshTokens.Where(rt => rt.UserId == userId && !rt.IsRevoked);
+            if (currentFamily is { } family)
+                others = others.Where(rt => rt.FamilyId != family);
+
+            await others.ExecuteUpdateAsync(s => s
+                .SetProperty(rt => rt.IsRevoked, true)
+                .SetProperty(rt => rt.RevokedAt, DateTime.UtcNow));
         }
 
         public async Task<List<UserSessionDto>> GetUserSessionsAsync(string userId, string? currentRefreshToken)
@@ -111,6 +150,9 @@ namespace auth.webapi.Services
 
         public async Task<ResponseUserDto> RegisterUserAsync(CreateUserDto createUserDto, ApplicationClient app, string ipAddress, string userAgent)
         {
+            if (!app.RegistrationEnabled)
+                throw new RegistrationDisabledException();
+
             var email = createUserDto.Email.Trim();
             var normalizedEmail = _userManager.NormalizeEmail(email);
 
@@ -140,7 +182,7 @@ namespace auth.webapi.Services
             var tokens = await IssueTokensAsync(appUser, app, Guid.NewGuid(), ipAddress, userAgent);
 
             var safeName = System.Net.WebUtility.HtmlEncode(appUser.FullName);
-            await _emailService.SendEmailAsync(appUser.Email, "Welcome to Our App", $"<h1>Hello {safeName}!</h1><p>Thanks for registering!</p>");
+            await _emailService.SendEmailAsync(appUser.Email, $"Welcome to {app.Name}", $"<h1>Hello {safeName}!</h1><p>Thanks for registering!</p>");
 
             return ToResponse(appUser, tokens);
         }

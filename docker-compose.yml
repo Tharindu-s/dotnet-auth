@@ -1,0 +1,71 @@
+# Everything you need for a local auth server:
+#
+#   cp .env.example .env      # then set API_KEY_SALT
+#   docker compose up -d
+#
+# Argus (the admin console) is at http://localhost:8081. Sign in with ADMIN_EMAIL and ADMIN_PASSWORD
+# (or the generated password: docker compose logs api | grep "generated password").
+# Your projects call the API at http://localhost:5183 (or through Argus at http://localhost:8081/api).
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auth
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-auth}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth -d auth"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-5183}:8080"
+    environment:
+      ConnectionStrings__DefaultConnection: Host=db;Database=auth;Username=auth;Password=${POSTGRES_PASSWORD:-auth}
+      Database__MigrateOnStartup: "true"
+      Security__ApiKeySalt: ${API_KEY_SALT:?Set API_KEY_SALT in .env (see .env.example)}
+      # Tokens name this issuer; downstream APIs check it
+      JWT__Issuer: ${JWT_ISSUER:-http://localhost:5183}
+      JWT__Audience: ${JWT_ISSUER:-http://localhost:5183}
+      # A signing key is generated into the keys volume on first start and reused afterwards
+      JWT__PrivateKeyPath: /app/data/signing-key.pem
+      JWT__GenerateIfMissing: "true"
+      Argus__AllowedOrigins__0: http://localhost:${ARGUS_PORT:-8081}
+      Argus__AdminEmail: ${ADMIN_EMAIL:-admin@argus.local}
+      Argus__AdminPassword: ${ADMIN_PASSWORD:-}
+      Argus__ResetAdminPassword: ${RESET_ADMIN_PASSWORD:-false}
+      # Browser apps that call the API directly on :5183 (instead of through their own proxy)
+      Cors__AllowedOrigins__0: ${CORS_ORIGIN:-http://localhost:5173}
+      # Trust X-Forwarded-For from the Argus nginx container, so sessions show real client IPs
+      ForwardedHeaders__KnownNetworks__0: 172.16.0.0/12
+      # Optional: SMTP for welcome emails. Without it, emails are only logged.
+      EmailSettings__From: ${SMTP_FROM:-}
+      EmailSettings__Username: ${SMTP_USERNAME:-}
+      EmailSettings__Password: ${SMTP_PASSWORD:-}
+    volumes:
+      - keys:/app/data
+
+  argus:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${ARGUS_PORT:-8081}:8080"
+    environment:
+      API_UPSTREAM: http://api:8080
+
+volumes:
+  pgdata:
+  keys:

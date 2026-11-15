@@ -1,17 +1,40 @@
 # Requests for the VS Code REST Client extension or the Visual Studio .http editor.
-# Run them top to bottom: create an app, register, then use the returned values.
+# Run them top to bottom: sign in as the Argus admin, create an app, then use the returned values.
 @host = http://localhost:5183
-@adminKey = <Security:AdminApiKey>
+@argusOrigin = http://localhost:5173
+@argusAppId = <appId from argus config>
+@adminEmail = admin@argus.local
+@adminPassword = <your admin password>
+@adminToken = <accessToken from admin login>
 @appId = <id from create-app>
 @apiKey = <rawApiKey from create-app>
 @accessToken = <accessToken from register or login>
 
-### Create an application client (admin only)
-POST {{host}}/api/application-client
+### Argus config (the admin console's app ID)
+GET {{host}}/api/argus/config
+
+### Admin login, as the Argus console would send it
+POST {{host}}/api/auth/login
 Content-Type: application/json
-X-Admin-Key: {{adminKey}}
+X-App-Id: {{argusAppId}}
+Origin: {{argusOrigin}}
+
+{ "email": "{{adminEmail}}", "password": "{{adminPassword}}" }
+
+### Create an app (Argus admin only)
+POST {{host}}/api/apps
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
 
 { "name": "My App", "audience": "my-app-api" }
+
+### List apps
+GET {{host}}/api/apps
+Authorization: Bearer {{adminToken}}
+
+### Users of an app
+GET {{host}}/api/apps/{{appId}}/users
+Authorization: Bearer {{adminToken}}
 
 ### Register
 POST {{host}}/api/auth/register
@@ -31,6 +54,13 @@ X-Api-Key: {{apiKey}}
 
 ### Refresh (uses the refreshToken cookie from register or login)
 POST {{host}}/api/auth/refresh
+
+### Change password
+POST {{host}}/api/auth/change-password
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{ "currentPassword": "Passw0rd!", "newPassword": "N3w-Passw0rd!" }
 
 ### List sessions
 GET {{host}}/api/auth/sessions
