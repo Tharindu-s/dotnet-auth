@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore dotnet-auth.sln
+
+      - name: Build
+        run: dotnet build dotnet-auth.sln --no-restore -c Release
+
+      - name: Check migrations match the model
+        run: |
+          dotnet tool install --global dotnet-ef --version 9.0.7
+          dotnet ef migrations has-pending-model-changes --project auth.webapi --no-build --configuration Release
+        env:
+          # Design-time only: nothing connects, but the app needs these to build its services
+          ConnectionStrings__DefaultConnection: Host=localhost;Database=unused
+
+      - name: Unit tests
+        run: dotnet test auth.unitTest --no-build -c Release
+
+      # Starts a Postgres container through Testcontainers; Docker is available on ubuntu runners
+      - name: Integration tests
+        run: dotnet test auth.integrationTest --no-build -c Release
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      # Type-checks (tsc -b) and builds the production bundle
+      - run: npm run build

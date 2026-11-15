@@ -23,13 +23,15 @@ namespace auth.webapi.Middleware
             }
             catch (AppException ex)
             {
-                _logger.LogError(ex, "Application exception occurred");
-
                 context.Response.ContentType = "application/json";
 
                 var statusCode = ExceptionStatusCodeMapper.Map.TryGetValue(ex.GetType(), out var code)
                     ? code
                     : HttpStatusCode.BadRequest;
+
+                // These are client errors (bad password, expired token...), not bugs: one line, no stack trace
+                _logger.LogWarning("{Method} {Path} returned {StatusCode}: {Message}",
+                    context.Request.Method, context.Request.Path, (int)statusCode, ex.Message);
 
                 context.Response.StatusCode = (int)statusCode;
 

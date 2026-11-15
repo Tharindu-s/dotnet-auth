@@ -1,464 +1,324 @@
-# Authentication Web API Documentation
+# Auth API reference
 
-## Overview
+Every endpoint of the auth service, with request and response examples. For setup, configuration and the design behind it, see the [root README](../../README.md).
 
-This is a comprehensive authentication and authorization API built with ASP.NET Core. The API provides user registration, login, token management, session tracking, and application client management capabilities.
+- **Base URL (development):** `http://localhost:5183` (or `https://localhost:7023` with the `https` profile)
+- **Content type:** `application/json`
+- **Swagger UI:** `/swagger`, with fields for the custom headers
 
-**Base URL**: `https://localhost:5183` (Development)  
-**API Version**: 1.0  
-**Content-Type**: `application/json`
+## Contents
 
-## Table of Contents
+1. [Authentication methods](#authentication-methods)
+2. [Application clients](#application-clients)
+3. [Register](#register)
+4. [Login](#login)
+5. [Refresh](#refresh)
+6. [Logout](#logout)
+7. [Current user](#current-user)
+8. [Sessions](#sessions)
+9. [JWKS](#jwks)
+10. [Errors](#errors)
+11. [Rate limits and lockout](#rate-limits-and-lockout)
+12. [Validating tokens in your own API](#validating-tokens-in-your-own-api)
 
-1. [Authentication](#authentication)
-2. [Application Client Management](#application-client-management)
-3. [User Authentication](#user-authentication)
-4. [Session Management](#session-management)
-5. [Error Handling](#error-handling)
-6. [Rate Limiting](#rate-limiting)
-7. [Security](#security)
+## Authentication methods
 
----
+| Name | How | Used by |
+| --- | --- | --- |
+| Admin key | `X-Admin-Key: <Security:AdminApiKey>` | Creating application clients |
+| App credentials, confidential client | `X-App-Id: <id>` and `X-Api-Key: <rawApiKey>` | Register, login, logout from a server |
+| App credentials, public client | `X-App-Id: <id>`, and the browser's `Origin` header must be one of the app's `allowedOrigins` | Register, login, logout from a browser app |
+| Access token | `Authorization: Bearer <accessToken>` | Logout, me, sessions |
+| Refresh cookie | `refreshToken` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`), set by register, login and refresh | Refresh, and marking the current session |
 
-## Authentication
+Browsers send the cookie automatically on same-origin requests. From another origin, send requests with credentials (`credentials: 'include'` or `withCredentials: true`) and add the origin to `Cors:AllowedOrigins`.
 
-### Application Client Authentication
+## Application clients
 
-Most endpoints require application client authentication using headers:
+### Create an application client
 
-- `X-App-Id`: Application client GUID
-- `X-Api-Key`: API key for the application client
+`POST /api/application-client`
 
-### JWT Token Authentication
+**Requires:** `X-Admin-Key`
 
-Protected endpoints require a valid JWT access token in the Authorization header:
+| Field | Type | Notes |
+| --- | --- | --- |
+| `name` | string, required | Up to 100 characters |
+| `audience` | string, optional | The `aud` your API will check, such as `notes-api`. Defaults to the app ID. |
+| `isPublic` | boolean, optional | `true` for browser apps. Default `false`. |
+| `allowedOrigins` | string[] | Required when `isPublic` is `true`. `scheme://host[:port]`, no path. |
 
-```
-Authorization: Bearer <access_token>
-```
-
-### Refresh Token
-
-Refresh tokens are automatically set as HTTP-only cookies and are used for token refresh operations.
-
----
-
-## Application Client Management
-
-### Create Application Client
-
-Creates a new application client and returns the API credentials.
-
-**Endpoint**: `POST /api/application-client`
-
-**Headers**: None required
-
-**Request Body**:
-
-```json
-{
-  "name": "string"
-}
-```
-
-**Response**: `200 OK`
-
-```json
-{
-  "id": "uuid",
-  "rawApiKey": "string"
-}
-```
-
-**Example**:
+Confidential client:
 
 ```bash
-curl -X POST "https://localhost:5183/api/application-client" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Application"
-  }'
+curl -X POST http://localhost:5183/api/application-client \
+  -H "Content-Type: application/json" -H "X-Admin-Key: <admin key>" \
+  -d '{ "name": "Notes backend", "audience": "notes-api" }'
 ```
-
-**Notes**:
-
-- The `rawApiKey` is only returned once and should be stored securely
-- Use the returned `id` and `rawApiKey` for subsequent API calls
-
----
-
-## User Authentication
-
-### Register User
-
-Registers a new user account.
-
-**Endpoint**: `POST /api/auth/register`
-
-**Headers**:
-
-- `X-App-Id`: Application client GUID
-- `X-Api-Key`: API key
-- `User-Agent`: Client user agent (optional)
-
-**Request Body**:
 
 ```json
 {
-  "fullName": "string",
-  "email": "string",
-  "city": "string",
-  "password": "string"
+  "id": "6f1c1c1e-6b2a-4c11-9a39-3c3f7d2b9a10",
+  "audience": "notes-api",
+  "isPublic": false,
+  "allowedOrigins": [],
+  "rawApiKey": "q0V8...base64...="
 }
 ```
 
-**Response**: `200 OK`
-
-```json
-{
-  "id": "string",
-  "fullName": "string",
-  "userName": "string",
-  "email": "string",
-  "city": "string",
-  "accessToken": "string"
-}
-```
-
-**Example**:
+Public client:
 
 ```bash
-curl -X POST "https://localhost:5183/api/auth/register" \
-  -H "Content-Type: application/json" \
-  -H "X-App-Id: your-app-id" \
-  -H "X-Api-Key: your-api-key" \
-  -H "User-Agent: MyApp/1.0" \
-  -d '{
-    "fullName": "John Doe",
-    "email": "john.doe@example.com",
-    "city": "New York",
-    "password": "SecurePassword123!"
-  }'
+curl -X POST http://localhost:5183/api/application-client \
+  -H "Content-Type: application/json" -H "X-Admin-Key: <admin key>" \
+  -d '{ "name": "Notes web", "audience": "notes-api", "isPublic": true, "allowedOrigins": ["http://localhost:5173"] }'
 ```
-
-**Validation Rules**:
-
-- `fullName`: Required, non-empty string
-- `email`: Required, valid email format
-- `city`: Required, non-empty string
-- `password`: Required, minimum security requirements
-
-### Login User
-
-Authenticates a user and returns access credentials.
-
-**Endpoint**: `POST /api/auth/login`
-
-**Headers**:
-
-- `X-App-Id`: Application client GUID
-- `X-Api-Key`: API key
-- `User-Agent`: Client user agent (optional)
-
-**Request Body**:
 
 ```json
 {
-  "email": "string",
-  "password": "string"
+  "id": "0b8d9a5e-2f7e-4c55-8d0a-1f3b2a7c9e44",
+  "audience": "notes-api",
+  "isPublic": true,
+  "allowedOrigins": ["http://localhost:5173"],
+  "rawApiKey": null
 }
 ```
 
-**Response**: `200 OK`
+**Notes**
+
+- `rawApiKey` is shown once. Only its HMAC hash is stored, so a lost key can't be recovered; create a new app.
+- Origins are normalized to lowercase without a trailing slash.
+- **Errors:** 401 if the admin key is missing or wrong, or if `Security:AdminApiKey` isn't configured. 400 for a public client without origins, or an invalid origin.
+
+## Register
+
+`POST /api/auth/register`
+
+**Requires:** app credentials
 
 ```json
 {
-  "id": "string",
-  "fullName": "string",
-  "userName": "string",
-  "email": "string",
-  "city": "string",
-  "accessToken": "string"
+  "fullName": "Jane Doe",
+  "email": "jane@example.com",
+  "city": "Colombo",
+  "password": "Passw0rd!"
 }
 ```
 
-**Example**:
-
-```bash
-curl -X POST "https://localhost:5183/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -H "X-App-Id: your-app-id" \
-  -H "X-Api-Key: your-api-key" \
-  -H "User-Agent: MyApp/1.0" \
-  -d '{
-    "email": "john.doe@example.com",
-    "password": "SecurePassword123!"
-  }'
-```
-
-### Refresh Token
-
-Refreshes an expired access token using the refresh token.
-
-**Endpoint**: `POST /api/auth/refresh`
-
-**Headers**:
-
-- `Authorization`: Bearer token (expired access token)
-- `User-Agent`: Client user agent (optional)
-
-**Cookies**:
-
-- `refreshToken`: HTTP-only cookie containing the refresh token
-
-**Response**: `200 OK`
+**Response:** `200 OK`, plus the `refreshToken` cookie
 
 ```json
 {
-  "accessToken": "string"
+  "id": "4c4939c5-0f70-4ac2-8a24-9d33cd45f773",
+  "fullName": "Jane Doe",
+  "userName": "jane@example.com",
+  "email": "jane@example.com",
+  "city": "Colombo",
+  "accessToken": "eyJhbGciOiJSUzI1NiIs..."
 }
 ```
 
-**Example**:
+**Rules**
 
-```bash
-curl -X POST "https://localhost:5183/api/auth/refresh" \
-  -H "Authorization: Bearer expired-access-token" \
-  -H "User-Agent: MyApp/1.0" \
-  --cookie "refreshToken=your-refresh-token"
-```
+- `fullName` and `city`: required, up to 100 characters. `email`: required, valid, up to 256 characters.
+- Password: at least 6 characters, with a digit, a lowercase letter, an uppercase letter, and a character that is neither a letter nor a digit.
+- Emails are unique per app and compared case-insensitively. The same email can register in another app.
 
-### Logout User
+**Errors:** 400 with the failed password rules in `message`, 401 for bad app credentials, 409 if the email is taken in this app, 429 when rate limited.
 
-Logs out the current user and invalidates the refresh token.
+## Login
 
-**Endpoint**: `POST /api/auth/logout`
+`POST /api/auth/login`
 
-**Headers**:
-
-- `Authorization`: Bearer token (valid access token)
-
-**Cookies**:
-
-- `refreshToken`: HTTP-only cookie containing the refresh token
-
-**Response**: `200 OK`
+**Requires:** app credentials
 
 ```json
-"Logged out successfully"
+{ "email": "jane@example.com", "password": "Passw0rd!" }
 ```
 
-**Example**:
+**Response:** same as register, `200 OK` plus the `refreshToken` cookie. Each login starts a new session.
+
+**Errors:** 401 for a wrong email or password (the message doesn't say which), 401 for bad app credentials, 423 when the account is locked, 429 when rate limited.
+
+## Refresh
+
+`POST /api/auth/refresh`
+
+**Requires:** the `refreshToken` cookie. No body, no app credentials, no access token.
 
 ```bash
-curl -X POST "https://localhost:5183/api/auth/logout" \
-  -H "Authorization: Bearer valid-access-token" \
-  --cookie "refreshToken=your-refresh-token"
+curl -X POST http://localhost:5183/api/auth/refresh -b cookies.txt -c cookies.txt
 ```
 
----
+**Response:** `200 OK`, plus a new `refreshToken` cookie
 
-## Session Management
+```json
+{ "accessToken": "eyJhbGciOiJSUzI1NiIs..." }
+```
 
-### Get User Sessions
+**Notes**
 
-Retrieves all active sessions for the authenticated user.
+- The presented token is revoked and replaced. Store the new cookie: the old one won't work again.
+- If an already-rotated token is presented more than 30 seconds after its rotation, every token from that login is revoked (reuse detection). Within 30 seconds the request just fails with 401, which covers two tabs refreshing at once.
+- Don't send two refreshes with the same cookie in parallel; only one succeeds.
 
-**Endpoint**: `GET /api/auth/sessions`
+**Errors:** 401 if the cookie is missing, unknown, revoked or expired. 429 when rate limited.
 
-**Headers**:
+## Logout
 
-- `Authorization`: Bearer token (valid access token)
+`POST /api/auth/logout`
 
-**Response**: `200 OK`
+**Requires:** access token and app credentials. Send the cookie too.
+
+```bash
+curl -X POST http://localhost:5183/api/auth/logout -b cookies.txt \
+  -H "Authorization: Bearer <accessToken>" -H "X-App-Id: <id>" -H "X-Api-Key: <rawApiKey>"
+```
+
+**Response:** `204 No Content`. The current session's refresh token is revoked and the cookie is cleared. Other devices stay signed in. Logging out twice, or without a cookie, also returns 204.
+
+**Errors:** 401 for a missing or expired access token, or bad app credentials.
+
+## Current user
+
+`GET /api/auth/me`
+
+**Requires:** access token
+
+```json
+{
+  "id": "4c4939c5-0f70-4ac2-8a24-9d33cd45f773",
+  "fullName": "Jane Doe",
+  "userName": "jane@example.com",
+  "email": "jane@example.com",
+  "city": "Colombo",
+  "appId": "0b8d9a5e-2f7e-4c55-8d0a-1f3b2a7c9e44",
+  "roles": ["User"]
+}
+```
+
+A browser app calls this after a page reload: refresh gives it an access token, and `/me` gives it the profile.
+
+**Errors:** 401 without a valid access token, 404 if the user was deleted.
+
+## Sessions
+
+### List sessions
+
+`GET /api/auth/sessions`
+
+**Requires:** access token. Send the cookie to get `isCurrent`.
 
 ```json
 [
   {
-    "tokenId": 1,
-    "device": "string",
-    "ipAddress": "string",
-    "issuedAt": "2024-01-01T00:00:00Z",
-    "expiresAt": "2024-01-08T00:00:00Z"
+    "tokenId": 12,
+    "device": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ... Chrome/140.0 Safari/537.36",
+    "ipAddress": "203.0.113.7",
+    "issuedAt": "2026-10-25T08:00:00Z",
+    "expiresAt": "2026-11-01T08:00:00Z",
+    "isCurrent": true
   }
 ]
 ```
 
-**Example**:
+Newest first. Only unexpired, unrevoked sessions are listed. `tokenId` changes each time a session refreshes, because it identifies the session's current token.
 
-```bash
-curl -X GET "https://localhost:5183/api/auth/sessions" \
-  -H "Authorization: Bearer valid-access-token"
-```
+### Revoke a session
 
----
+`DELETE /api/auth/sessions/{tokenId}`
 
-## Error Handling
+**Requires:** access token
 
-The API uses standard HTTP status codes and returns detailed error messages.
+**Response:** `204 No Content`. That device can't refresh again. Its current access token stays valid until it expires (at most 15 minutes).
 
-### Common Error Responses
+To end the current session, use [logout](#logout) instead so the cookie is cleared.
 
-**400 Bad Request**
+**Errors:** 404 if the session doesn't exist, is already revoked, or belongs to another user.
+
+## JWKS
+
+`GET /.well-known/jwks.json`
 
 ```json
 {
-  "message": "Validation error message",
-  "statusCode": 400
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "kid": "urk1B6XCC9deOFnd8OV3RDC7kM4TXUJmIvzUEBOaEwc",
+      "alg": "RS256",
+      "n": "...",
+      "e": "AQAB"
+    }
+  ]
 }
 ```
 
-**401 Unauthorized**
+The `kid` is the key's RFC 7638 thumbprint, so it changes whenever the key does. Cache the key set and refetch when a token's `kid` isn't in it.
+
+## Errors
+
+Errors thrown by the service return:
+
+```json
+{ "message": "Invalid username or password." }
+```
+
+Debug builds add a `detail` field to 500 responses. Invalid request bodies are rejected by ASP.NET's model validation with a standard problem-details response:
 
 ```json
 {
-  "message": "Authentication failed",
-  "statusCode": 401
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": { "Email": ["The Email field is not a valid e-mail address."] }
 }
 ```
 
-**403 Forbidden**
+| Status | Meaning |
+| --- | --- |
+| 400 | Invalid input, or password rules not met |
+| 401 | Not authenticated: wrong password, bad app credentials or origin, bad admin key, missing/expired access token, invalid refresh token |
+| 404 | User or session not found |
+| 409 | Email already registered in this app |
+| 423 | Account locked after too many failed logins |
+| 429 | Rate limit exceeded |
+| 500 | Unexpected server error |
 
-```json
-{
-  "message": "Access denied",
-  "statusCode": 403
-}
+## Rate limits and lockout
+
+- **Rate limits** are per client IP, in fixed windows. Login and register share one budget (default 10 per minute); refresh has its own (default 30 per minute). Exceeding it returns 429 with `{ "message": "Too many requests. Try again later." }`. Configure with `RateLimiting:Credentials` and `RateLimiting:Refresh`.
+- **Lockout:** 5 wrong passwords in a row lock the account for 15 minutes. While locked, login returns 423 even with the right password.
+
+Behind a reverse proxy, set `ForwardedHeaders:KnownNetworks` so the client's IP is used instead of the proxy's.
+
+## Validating tokens in your own API
+
+Access tokens are RS256 JWTs with a 15-minute lifetime. Validate:
+
+- the signature, against the key in the JWKS whose `kid` matches the token header;
+- `iss` equals the auth service's `JWT:Issuer`;
+- `aud` contains **your** app's audience (such as `notes-api`);
+- `exp`, with little or no clock skew.
+
+Useful claims: `nameid` (user ID), `email`, `unique_name`, `role` (one per role), `app_id`.
+
+ASP.NET Core example:
+
+```csharp
+var jwks = new JsonWebKeySet(await new HttpClient().GetStringAsync("http://localhost:5183/.well-known/jwks.json"));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = "http://localhost:5183",
+            ValidAudience = "notes-api",
+            IssuerSigningKeys = jwks.GetSigningKeys(),
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
 ```
 
-**404 Not Found**
-
-```json
-{
-  "message": "Resource not found",
-  "statusCode": 404
-}
-```
-
-**500 Internal Server Error**
-
-```json
-{
-  "message": "Internal server error",
-  "statusCode": 500
-}
-```
-
-### Specific Error Types
-
-- `ApplicationClientAuthenticationException`: Invalid or missing application client credentials
-- `RefreshTokenExpiredException`: Refresh token has expired
-- `AppUnauthorizedException`: Missing or invalid access token
-
----
-
-## Rate Limiting
-
-Currently, no explicit rate limiting is implemented. Consider implementing rate limiting for production use.
-
----
-
-## Security
-
-### JWT Configuration
-
-The API uses JWT tokens with the following configuration:
-
-- **Issuer**: `http://localhost:5183`
-- **Audience**: `http://localhost:5183`
-- **Signing Key**: Configured in `appsettings.json`
-- **Token Expiration**: Configurable (typically 15-60 minutes)
-- **Refresh Token Expiration**: 7 days
-
-### Security Headers
-
-The API includes security headers:
-
-- `Secure` cookies for HTTPS
-- `HttpOnly` cookies for refresh tokens
-- `SameSite=Strict` for CSRF protection
-
-### CORS Configuration
-
-CORS is configured to allow all origins in development. Configure appropriate origins for production.
-
----
-
-## Development Setup
-
-### Prerequisites
-
-- .NET 8.0 or later
-- PostgreSQL database
-- SMTP server for email functionality
-
-### Configuration
-
-Update `appsettings.json` with your configuration:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "your-database-connection-string"
-  },
-  "JWT": {
-    "Issuer": "your-issuer",
-    "Audience": "your-audience",
-    "SigningKey": "your-secure-signing-key"
-  },
-  "EmailSettings": {
-    "From": "your-email@domain.com",
-    "SmtpServer": "smtp.gmail.com",
-    "Username": "your-email@domain.com",
-  }
-
-# Navigate to project directory
-
-cd auth.webapi
-
-
-
-
-# Start the API
-
-dotnet run
-
-```
-
-The API will be available at `https://localhost:5183`
-
-### Swagger Documentation
-
-Interactive API documentation is available at:
-
-- Swagger UI: `https://localhost:5183/swagger`
-- OpenAPI JSON: `https://localhost:5183/swagger/v1/swagger.json`
-
----
-
-## Best Practices
-
-### Client Implementation
-
-3. **Secure cookie handling**: Ensure refresh tokens are handled securely
-4. **Error handling**: Implement proper error handling for all API responses
-5. **User agent**: Include meaningful user agent strings for session tracking
-
-### Security Considerations
-
-1. **HTTPS only**: Always use HTTPS in production
-2. **Token storage**: Store access tokens in memory, not persistent storage
-3. **Logout**: Always call logout endpoint when user signs out
-4. **Session monitoring**: Regularly check user sessions for security
-5. **Input validation**: Validate all user inputs on client side
-
----
-
-## Support
-
-For technical support or questions about the API, please refer to the project documentation or contact the development team.
-
----
-
-**Last Updated**: January 2024  
-**API Version**: 1.0
+This fetches the keys once at startup. Until the service publishes an OpenID discovery document, restart your API after the signing key changes.

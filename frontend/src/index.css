@@ -1,0 +1,118 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/schibsted-grotesk";
+
+/*
+  Look and feel modeled on a clean editorial landing style: white canvas, near-black ink,
+  pill buttons, tight grotesk headlines, and grainy purple / pink / coral color blocks.
+*/
+
+@theme inline {
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: 'Schibsted Grotesk Variable', var(--font-sans);
+
+    --color-ink: var(--foreground);
+    --color-surface: var(--surface);
+    --color-violet: var(--brand-violet);
+    --color-pink: var(--brand-pink);
+    --color-coral: var(--brand-coral);
+    --color-argus: var(--brand-argus);
+
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.4);
+    --radius-4xl: calc(var(--radius) * 3);
+}
+
+:root {
+    --background: #ffffff;
+    --foreground: #121211;
+    --surface: #f4f6f6;
+    --brand-violet: #934bf0;
+    --brand-pink: #fa7fd8;
+    --brand-coral: #fa7465;
+    /* Blue from the Argus logo's center dot */
+    --brand-argus: #2f5bff;
+
+    --card: #ffffff;
+    --card-foreground: #121211;
+    --popover: #ffffff;
+    --popover-foreground: #121211;
+    --primary: #121211;
+    --primary-foreground: #ffffff;
+    --secondary: #f4f6f6;
+    --secondary-foreground: #121211;
+    --muted: #f4f6f6;
+    --muted-foreground: #5f6363;
+    --accent: #eceff0;
+    --accent-foreground: #121211;
+    --destructive: #d9342b;
+    --border: #e4e8e8;
+    --input: #dfe3e3;
+    --ring: #934bf0;
+    --radius: 0.625rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1, h2, h3 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  /* Large tight headline, as in the reference hero */
+  .display-title {
+    @apply font-heading font-normal text-ink;
+    letter-spacing: -0.05em;
+    line-height: 1.02;
+  }
+
+  /* Film grain over the color blocks */
+  .grain {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}

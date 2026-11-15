@@ -47,9 +47,8 @@ Thumbs.db
 _ReSharper.*
 *.DotSettings.user
 
-## Ignore EF Core Migrations snapshots (optional)
-Migrations/*Snapshot.cs
 
 .vs
 secrets.json 
 private_key.pem
+dev-signing-key.pem

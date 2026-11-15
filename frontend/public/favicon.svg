@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -20 264 264">
+  <!-- Argus mark, small-size cut (heavier dots for 32px and below) -->
+  <style>
+    .dot { fill: #0e1116; }
+    .center { fill: #2f5bff; }
+    @media (prefers-color-scheme: dark) {
+      .dot { fill: #f5f6f8; }
+      .center { fill: #6e8bff; }
+    }
+  </style>
+  <circle class="dot" cx="23" cy="23" r="18.7" />
+  <circle class="dot" cx="112" cy="23" r="23.4" />
+  <circle class="dot" cx="201" cy="23" r="18.7" />
+  <circle class="dot" cx="23" cy="112" r="23.4" />
+  <circle class="center" cx="112" cy="112" r="42" />
+  <circle class="dot" cx="201" cy="112" r="23.4" />
+  <circle class="dot" cx="23" cy="201" r="18.7" />
+  <circle class="dot" cx="112" cy="201" r="23.4" />
+  <circle class="dot" cx="201" cy="201" r="18.7" />
+</svg>

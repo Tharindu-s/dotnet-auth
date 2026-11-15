@@ -1,10 +1,21 @@
+# Secrets are read from a Kubernetes secret named dotnet-auth-secrets. Create it first:
+#
+#   openssl genrsa -out signing-key.pem 2048
+#   kubectl create secret generic dotnet-auth-secrets -n dotnet-authentication \
+#     --from-literal=ConnectionStrings__DefaultConnection='Host=...;Database=...;Username=...;Password=...' \
+#     --from-literal=Security__ApiKeySalt="$(openssl rand -base64 32)" \
+#     --from-literal=Security__AdminApiKey="$(openssl rand -base64 32)" \
+#     --from-literal=EmailSettings__From='you@example.com' \
+#     --from-literal=EmailSettings__Username='you@example.com' \
+#     --from-literal=EmailSettings__Password='<app password>' \
+#     --from-file=JWT__PrivateKey=signing-key.pem
+#
+# Every replica loads the same signing key, so tokens survive restarts and validate on any pod.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dotnet-auth
   namespace: dotnet-authentication
-  # labels:
-  #   app: dotnet-auth
 spec:
   replicas: 2
   selector:
@@ -21,6 +32,14 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: dotnet-auth-secrets
+          env:
+            # Trust X-Forwarded-For from inside the cluster (the frontend's nginx).
+            # Match this to your cluster's pod network.
+            - name: ForwardedHeaders__KnownNetworks__0
+              value: 10.0.0.0/8
 ---
 apiVersion: v1
 kind: Service
@@ -33,5 +52,49 @@ spec:
   ports:
     - protocol: TCP
       port: 8080
+      targetPort: 8080
+  type: LoadBalancer
+---
+# React frontend: nginx serving the static build and proxying /api to the service above,
+# so the browser sees one origin. Build the image with the public app's ID:
+#   docker build -t tharindu007/dotnet-auth-frontend:latest --build-arg VITE_APP_ID=<public app id> frontend
+# The public app's allowedOrigins must include the URL users open, and TLS must terminate
+# in front of it, because the refresh cookie is Secure.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dotnet-auth-frontend
+  namespace: dotnet-authentication
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dotnet-auth-frontend
+  template:
+    metadata:
+      labels:
+        app: dotnet-auth-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: tharindu007/dotnet-auth-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: API_UPSTREAM
+              value: http://dotnet-auth:8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dotnet-auth-frontend
+  namespace: dotnet-authentication
+spec:
+  selector:
+    app: dotnet-auth-frontend
+  ports:
+    - protocol: TCP
+      port: 80
       targetPort: 8080
   type: LoadBalancer
