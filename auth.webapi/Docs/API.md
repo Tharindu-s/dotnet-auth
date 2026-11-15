@@ -9,86 +9,30 @@ Every endpoint of the auth service, with request and response examples. For setu
 ## Contents
 
 1. [Authentication methods](#authentication-methods)
-2. [Application clients](#application-clients)
-3. [Register](#register)
-4. [Login](#login)
-5. [Refresh](#refresh)
-6. [Logout](#logout)
-7. [Current user](#current-user)
+2. [Register](#register)
+3. [Login](#login)
+4. [Refresh](#refresh)
+5. [Logout](#logout)
+6. [Current user](#current-user)
+7. [Change password](#change-password)
 8. [Sessions](#sessions)
 9. [JWKS](#jwks)
-10. [Errors](#errors)
-11. [Rate limits and lockout](#rate-limits-and-lockout)
-12. [Validating tokens in your own API](#validating-tokens-in-your-own-api)
+10. [Admin console API](#admin-console-api)
+11. [Errors](#errors)
+12. [Rate limits and lockout](#rate-limits-and-lockout)
+13. [Validating tokens in your own API](#validating-tokens-in-your-own-api)
 
 ## Authentication methods
 
 | Name | How | Used by |
 | --- | --- | --- |
-| Admin key | `X-Admin-Key: <Security:AdminApiKey>` | Creating application clients |
 | App credentials, confidential client | `X-App-Id: <id>` and `X-Api-Key: <rawApiKey>` | Register, login, logout from a server |
 | App credentials, public client | `X-App-Id: <id>`, and the browser's `Origin` header must be one of the app's `allowedOrigins` | Register, login, logout from a browser app |
-| Access token | `Authorization: Bearer <accessToken>` | Logout, me, sessions |
+| Access token | `Authorization: Bearer <accessToken>` | Logout, me, change password, sessions |
+| Argus admin | An access token of an Argus user with the `Admin` role, checked against the database | The admin console API (`/api/apps`) |
 | Refresh cookie | `refreshToken` cookie (`HttpOnly`, `Secure`, `SameSite=Strict`), set by register, login and refresh | Refresh, and marking the current session |
 
 Browsers send the cookie automatically on same-origin requests. From another origin, send requests with credentials (`credentials: 'include'` or `withCredentials: true`) and add the origin to `Cors:AllowedOrigins`.
-
-## Application clients
-
-### Create an application client
-
-`POST /api/application-client`
-
-**Requires:** `X-Admin-Key`
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `name` | string, required | Up to 100 characters |
-| `audience` | string, optional | The `aud` your API will check, such as `notes-api`. Defaults to the app ID. |
-| `isPublic` | boolean, optional | `true` for browser apps. Default `false`. |
-| `allowedOrigins` | string[] | Required when `isPublic` is `true`. `scheme://host[:port]`, no path. |
-
-Confidential client:
-
-```bash
-curl -X POST http://localhost:5183/api/application-client \
-  -H "Content-Type: application/json" -H "X-Admin-Key: <admin key>" \
-  -d '{ "name": "Notes backend", "audience": "notes-api" }'
-```
-
-```json
-{
-  "id": "6f1c1c1e-6b2a-4c11-9a39-3c3f7d2b9a10",
-  "audience": "notes-api",
-  "isPublic": false,
-  "allowedOrigins": [],
-  "rawApiKey": "q0V8...base64...="
-}
-```
-
-Public client:
-
-```bash
-curl -X POST http://localhost:5183/api/application-client \
-  -H "Content-Type: application/json" -H "X-Admin-Key: <admin key>" \
-  -d '{ "name": "Notes web", "audience": "notes-api", "isPublic": true, "allowedOrigins": ["http://localhost:5173"] }'
-```
-
-```json
-{
-  "id": "0b8d9a5e-2f7e-4c55-8d0a-1f3b2a7c9e44",
-  "audience": "notes-api",
-  "isPublic": true,
-  "allowedOrigins": ["http://localhost:5173"],
-  "rawApiKey": null
-}
-```
-
-**Notes**
-
-- `rawApiKey` is shown once. Only its HMAC hash is stored, so a lost key can't be recovered; create a new app.
-- Origins are normalized to lowercase without a trailing slash.
-- **Errors:** 401 if the admin key is missing or wrong, or if `Security:AdminApiKey` isn't configured. 400 for a public client without origins, or an invalid origin.
 
 ## Register
 
@@ -124,7 +68,7 @@ curl -X POST http://localhost:5183/api/application-client \
 - Password: at least 6 characters, with a digit, a lowercase letter, an uppercase letter, and a character that is neither a letter nor a digit.
 - Emails are unique per app and compared case-insensitively. The same email can register in another app.
 
-**Errors:** 400 with the failed password rules in `message`, 401 for bad app credentials, 409 if the email is taken in this app, 429 when rate limited.
+**Errors:** 400 with the failed password rules in `message`, 401 for bad app credentials, 403 if the app has sign-ups turned off, 409 if the email is taken in this app, 429 when rate limited.
 
 ## Login
 
@@ -193,13 +137,28 @@ curl -X POST http://localhost:5183/api/auth/logout -b cookies.txt \
   "email": "jane@example.com",
   "city": "Colombo",
   "appId": "0b8d9a5e-2f7e-4c55-8d0a-1f3b2a7c9e44",
-  "roles": ["User"]
+  "roles": ["User"],
+  "mustChangePassword": false
 }
 ```
 
-A browser app calls this after a page reload: refresh gives it an access token, and `/me` gives it the profile.
+A browser app calls this after a page reload: refresh gives it an access token, and `/me` gives it the profile. `mustChangePassword` is true only for the seeded Argus admin until they choose their own password.
 
 **Errors:** 401 without a valid access token, 404 if the user was deleted.
+
+## Change password
+
+`POST /api/auth/change-password`
+
+**Requires:** access token. Send the cookie too, so the current session is kept.
+
+```json
+{ "currentPassword": "Passw0rd!", "newPassword": "N3w-Passw0rd!" }
+```
+
+**Response:** `204 No Content`. Every other session of the user is revoked; the session whose cookie came with the request stays signed in. Clears `mustChangePassword`.
+
+**Errors:** 400 if the current password is wrong, the new one breaks the password rules, or it's the same as the current one. 401 without a valid access token. 429 when rate limited (it shares the login budget).
 
 ## Sessions
 
@@ -257,6 +216,98 @@ To end the current session, use [logout](#logout) instead so the cookie is clear
 
 The `kid` is the key's RFC 7638 thumbprint, so it changes whenever the key does. Cache the key set and refetch when a token's `kid` isn't in it.
 
+## Admin console API
+
+These endpoints back the Argus console. They need an access token from an **Argus admin**: a user of the Argus app (the service's own app, created on first start) with the `Admin` role, not locked out, and without a pending password change. An `Admin` from any other app gets 403.
+
+The Argus app itself never appears here and can't be changed through these endpoints (404).
+
+### Console config
+
+`GET /api/argus/config` (no authentication)
+
+```json
+{ "appId": "e2803400-5f7f-4baf-b4d6-139f26b16d17", "issuer": "http://localhost:5183" }
+```
+
+The console reads the Argus app ID from here, so it isn't baked into the frontend build.
+
+### Apps
+
+| Method | Route | Body | Response |
+| --- | --- | --- | --- |
+| GET | `/api/apps` | | `App[]`, oldest first |
+| GET | `/api/apps/{id}` | | `App` |
+| POST | `/api/apps` | `{ name, audience?, isPublic?, allowedOrigins?, registrationEnabled? }` | `201 Created`, `App` plus `rawApiKey` |
+| PUT | `/api/apps/{id}` | `{ name, audience?, allowedOrigins?, registrationEnabled }` | `App` |
+| POST | `/api/apps/{id}/rotate-key` | | `{ rawApiKey }` |
+| DELETE | `/api/apps/{id}` | | `204`. Also deletes the app's users and sessions. |
+
+An `App`:
+
+```json
+{
+  "id": "6f1c1c1e-6b2a-4c11-9a39-3c3f7d2b9a10",
+  "name": "Notes backend",
+  "audience": "notes-api",
+  "isPublic": false,
+  "registrationEnabled": true,
+  "allowedOrigins": [],
+  "createdAt": "2026-11-15T10:00:00Z",
+  "userCount": 12,
+  "activeSessionCount": 7
+}
+```
+
+Creating a confidential app (`isPublic` false, the default):
+
+```bash
+curl -X POST http://localhost:5183/api/apps \
+  -H "Authorization: Bearer <admin access token>" -H "Content-Type: application/json" \
+  -d '{ "name": "Notes backend", "audience": "notes-api" }'
+```
+
+**Notes**
+
+- `rawApiKey` is returned once, on create and on rotate. Only its HMAC hash is stored. Rotating replaces the key immediately; public apps have no key (400).
+- `audience` defaults to the app ID. Changing it makes the app's API reject tokens issued before the change.
+- `allowedOrigins` is required for public apps. Origins are `scheme://host[:port]` with no path, normalized to lowercase without a trailing slash; blank entries are ignored.
+- Whether an app is public can't be changed after it's created.
+- With `registrationEnabled` false, register returns 403 and only existing users can sign in.
+
+### Users of an app
+
+| Method | Route | Response |
+| --- | --- | --- |
+| GET | `/api/apps/{id}/users?search=&page=1&pageSize=25` | `{ items, total, page, pageSize }`, sorted by email. `search` matches email or name, ignoring case. `pageSize` is at most 100. |
+| POST | `/api/apps/{id}/users/{userId}/lock` | `204`. Blocks sign-in until unlocked and revokes all the user's sessions. |
+| POST | `/api/apps/{id}/users/{userId}/unlock` | `204`. Also resets the failed-password count. |
+| DELETE | `/api/apps/{id}/users/{userId}` | `204`. Deletes the user and their sessions. |
+
+A user item:
+
+```json
+{
+  "id": "4c4939c5-0f70-4ac2-8a24-9d33cd45f773",
+  "email": "jane@example.com",
+  "fullName": "Jane Doe",
+  "city": "Colombo",
+  "isLockedOut": false,
+  "lockoutEnd": null,
+  "activeSessionCount": 2,
+  "lastSignInAt": "2026-11-15T09:12:00Z"
+}
+```
+
+### Sessions of an app
+
+| Method | Route | Response |
+| --- | --- | --- |
+| GET | `/api/apps/{id}/sessions?userId=` | Up to 200 active sessions, newest first: `{ tokenId, userId, userEmail, device, ipAddress, issuedAt, expiresAt }` |
+| DELETE | `/api/apps/{id}/sessions/{tokenId}` | `204`. That device can't refresh again. |
+
+**Errors (all admin endpoints):** 401 without a valid access token; 403 if the caller isn't an Argus admin or must change their password first; 423 if the admin is locked out; 404 for an unknown app, user or session (including the Argus app).
+
 ## Errors
 
 Errors thrown by the service return:
@@ -277,18 +328,19 @@ Debug builds add a `detail` field to 500 responses. Invalid request bodies are r
 
 | Status | Meaning |
 | --- | --- |
-| 400 | Invalid input, or password rules not met |
-| 401 | Not authenticated: wrong password, bad app credentials or origin, bad admin key, missing/expired access token, invalid refresh token |
-| 404 | User or session not found |
+| 400 | Invalid input, password rules not met, or wrong current password |
+| 401 | Not authenticated: wrong password, bad app credentials or origin, missing/expired access token, invalid refresh token |
+| 403 | Not allowed: not an Argus admin, admin password change pending, or sign-ups turned off for the app |
+| 404 | App, user or session not found |
 | 409 | Email already registered in this app |
-| 423 | Account locked after too many failed logins |
+| 423 | Account locked (too many failed logins, or locked by an admin) |
 | 429 | Rate limit exceeded |
 | 500 | Unexpected server error |
 
 ## Rate limits and lockout
 
-- **Rate limits** are per client IP, in fixed windows. Login and register share one budget (default 10 per minute); refresh has its own (default 30 per minute). Exceeding it returns 429 with `{ "message": "Too many requests. Try again later." }`. Configure with `RateLimiting:Credentials` and `RateLimiting:Refresh`.
-- **Lockout:** 5 wrong passwords in a row lock the account for 15 minutes. While locked, login returns 423 even with the right password.
+- **Rate limits** are per client IP, in fixed windows. Login, register and change password share one budget (default 10 per minute); refresh has its own (default 30 per minute). Exceeding it returns 429 with `{ "message": "Too many requests. Try again later." }`. Configure with `RateLimiting:Credentials` and `RateLimiting:Refresh`.
+- **Lockout:** 5 wrong passwords in a row lock the account for 15 minutes. An admin can also lock an account until they unlock it. While locked, login returns 423 even with the right password.
 
 Behind a reverse proxy, set `ForwardedHeaders:KnownNetworks` so the client's IP is used instead of the proxy's.
 
