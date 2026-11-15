@@ -8,9 +8,7 @@ RUN npm ci
 
 COPY . .
 
-# Baked into the bundle at build time. It's an ID, not a secret.
-ARG VITE_APP_ID
-ENV VITE_APP_ID=$VITE_APP_ID
+# No app ID is baked in: the app reads it from GET /api/argus/config when it starts
 RUN npm run build
 
 # Stage 2: Serve it with nginx, which also proxies the API so the browser sees one origin
