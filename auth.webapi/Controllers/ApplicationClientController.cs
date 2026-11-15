@@ -1,25 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using auth.webapi.DTO.ApplicationClient;
+using auth.webapi.Filters;
 using auth.webapi.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace auth.webapi.Controllers
 {
     [Route("api/application-client")]
     [ApiController] // no need to validate the model state in each endpoint after adding this
+    [RequireAdminKey]
     public class ApplicationClientController : ControllerBase
     {
-        private readonly ILogger<ApplicationClientController> _logger;
         private readonly IApplicationClientService _application;
 
-        public ApplicationClientController(ILogger<ApplicationClientController> logger, IApplicationClientService application)
+        public ApplicationClientController(IApplicationClientService application)
         {
-            _logger = logger;
             _application = application;
         }
 
@@ -27,12 +21,7 @@ namespace auth.webapi.Controllers
         public async Task<IActionResult> CreateAppId([FromBody] CreateApplicationClientDto dto)
         {
             var result = await _application.RegisterApplication(dto);
-
-            return Ok(new ResponseCreateApplicationClientDto
-            {
-                Id = result.Id,
-                RawApiKey = result.RawApiKey
-            });
+            return Ok(result);
         }
     }
 }

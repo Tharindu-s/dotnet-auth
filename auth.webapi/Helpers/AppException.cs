@@ -55,6 +55,24 @@ namespace auth.webapi.Helpers
         public UserCreationFailedException(string message, Exception inner) : base(message, inner) { }
     }
 
+    public class InvalidRefreshTokenException : AppException
+    {
+        public InvalidRefreshTokenException() : base("The refresh token is invalid or has been revoked.") { }
+        public InvalidRefreshTokenException(string message) : base(message) { }
+    }
+
+    public class AccountLockedException : AppException
+    {
+        public AccountLockedException() : base("Too many failed login attempts. The account is locked, try again later.") { }
+        public AccountLockedException(string message) : base(message) { }
+    }
+
+    public class SessionNotFoundException : AppException
+    {
+        public SessionNotFoundException() : base("Session not found.") { }
+        public SessionNotFoundException(string message) : base(message) { }
+    }
+
     public class InvalidTokenException : AppException
     {
         public InvalidTokenException() : base("The access token is invalid or malformed.") { }

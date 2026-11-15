@@ -47,5 +47,3 @@ Thumbs.db
 _ReSharper.*
 *.DotSettings.user
 
-## Ignore EF Core Migrations snapshots (optional)
-Migrations/*Snapshot.cs

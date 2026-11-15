@@ -9,10 +9,14 @@ namespace auth.webapi.Helpers
             new Dictionary<Type, HttpStatusCode>
             {
                 { typeof(UserNotFoundException), HttpStatusCode.NotFound },
+                { typeof(SessionNotFoundException), HttpStatusCode.NotFound },
                 { typeof(InvalidCredentialsException), HttpStatusCode.Unauthorized },
                 { typeof(AppUnauthorizedException), HttpStatusCode.Unauthorized },
+                { typeof(ApplicationClientAuthenticationException), HttpStatusCode.Unauthorized },
                 { typeof(EmailAlreadyExistsException), HttpStatusCode.Conflict },
                 { typeof(RefreshTokenExpiredException), HttpStatusCode.Unauthorized },
+                { typeof(InvalidRefreshTokenException), HttpStatusCode.Unauthorized },
+                { typeof(AccountLockedException), HttpStatusCode.Locked },
                 { typeof(UserCreationFailedException), HttpStatusCode.BadRequest},
                 { typeof(InvalidTokenException), HttpStatusCode.Unauthorized }
             }.ToImmutableDictionary();

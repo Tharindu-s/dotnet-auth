@@ -1,6 +1,46 @@
-@auth.webapi_HostAddress = http://localhost:5183
+# Requests for the VS Code REST Client extension or the Visual Studio .http editor.
+# Run them top to bottom: create an app, register, then use the returned values.
+@host = http://localhost:5183
+@adminKey = <Security:AdminApiKey>
+@appId = <id from create-app>
+@apiKey = <rawApiKey from create-app>
+@accessToken = <accessToken from register or login>
 
-GET {{auth.webapi_HostAddress}}/weatherforecast/
-Accept: application/json
+### Create an application client (admin only)
+POST {{host}}/api/application-client
+Content-Type: application/json
+X-Admin-Key: {{adminKey}}
 
-###
+{ "name": "My App", "audience": "my-app-api" }
+
+### Register
+POST {{host}}/api/auth/register
+Content-Type: application/json
+X-App-Id: {{appId}}
+X-Api-Key: {{apiKey}}
+
+{ "fullName": "Jane Doe", "email": "jane@example.com", "city": "Colombo", "password": "Passw0rd!" }
+
+### Login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+X-App-Id: {{appId}}
+X-Api-Key: {{apiKey}}
+
+{ "email": "jane@example.com", "password": "Passw0rd!" }
+
+### Refresh (uses the refreshToken cookie from register or login)
+POST {{host}}/api/auth/refresh
+
+### List sessions
+GET {{host}}/api/auth/sessions
+Authorization: Bearer {{accessToken}}
+
+### Logout
+POST {{host}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+X-App-Id: {{appId}}
+X-Api-Key: {{apiKey}}
+
+### Public signing keys
+GET {{host}}/.well-known/jwks.json

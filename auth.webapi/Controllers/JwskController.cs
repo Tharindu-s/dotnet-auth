@@ -1,5 +1,4 @@
 using auth.webapi.Interfaces;
-using auth.webapi.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace auth.webapi.Controllers
