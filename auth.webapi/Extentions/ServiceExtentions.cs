@@ -52,6 +52,25 @@ namespace auth.webapi.Extentions
                 options.TokenLifespan = TimeSpan.FromHours(2));
         }
 
+        // The Argus admin console: its settings and the startup step that creates its app and first admin
+        public static void ConfigureArgus(this IServiceCollection services)
+        {
+            services.AddOptions<ArgusOptions>().BindConfiguration("Argus");
+            services.AddScoped<ArgusBootstrapper>();
+        }
+
+        // Run after the app is built and before it starts listening
+        public static async Task RunStartupTasksAsync(this IServiceProvider services)
+        {
+            await using var scope = services.CreateAsyncScope();
+            var provider = scope.ServiceProvider;
+
+            if (provider.GetRequiredService<IConfiguration>().GetValue<bool>("Database:MigrateOnStartup"))
+                await provider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync();
+
+            await provider.GetRequiredService<ArgusBootstrapper>().RunAsync();
+        }
+
         public static void ConfigureJwtAuthentication(this IServiceCollection services)
         {
             services.AddSingleton<ISigningKeyService, SigningKeyService>();

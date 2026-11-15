@@ -17,6 +17,7 @@ namespace auth.integrationTest
         public const string Password = "Passw0rd!";
 
         private readonly HttpClient _http;
+        private string? _adminToken;
 
         public ApiClient(HttpClient http)
         {
@@ -34,16 +35,32 @@ namespace auth.integrationTest
 
         private async Task<AppCredentials> CreateAppAsync(object body)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/application-client")
-            {
-                Content = JsonContent.Create(body)
-            };
-            request.Headers.Add("X-Admin-Key", AuthApiFactory.AdminKey);
-
-            var response = await _http.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-            return (await response.Content.ReadFromJsonAsync<AppCredentials>())!;
+            var result = await AdminAsync(HttpMethod.Post, "/api/apps", body);
+            Assert.Equal(HttpStatusCode.Created, result.Status);
+            return result.Body.Deserialize<AppCredentials>(JsonSerializerOptions.Web)!;
         }
+
+        // The Argus app, as the Argus frontend would call it from its own origin
+        public async Task<AppCredentials> ArgusAppAsync()
+        {
+            var config = await _http.GetFromJsonAsync<JsonElement>("/api/argus/config");
+            return new AppCredentials(config.GetProperty("appId").GetGuid(), AuthApiFactory.Issuer, null, AuthApiFactory.ArgusOrigin);
+        }
+
+        // An access token for the seeded Argus admin, fetched once per client
+        public async Task<string> AdminTokenAsync()
+        {
+            if (_adminToken != null)
+                return _adminToken;
+
+            var login = await LoginAsync(await ArgusAppAsync(), AuthApiFactory.AdminEmail, AuthApiFactory.AdminPassword);
+            Assert.Equal(HttpStatusCode.OK, login.Status);
+            return _adminToken = login.AccessToken!;
+        }
+
+        // A request to the admin console API as the seeded admin
+        public async Task<AuthResult> AdminAsync(HttpMethod method, string path, object? body = null) =>
+            await SendAuthAsync(method, path, null, body, await AdminTokenAsync());
 
         public static string UniqueEmail() => $"user-{Guid.NewGuid():N}@example.com";
 

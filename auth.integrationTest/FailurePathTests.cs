@@ -97,11 +97,11 @@ namespace auth.integrationTest
         }
 
         [Fact]
-        public async Task CreateApp_WithoutAdminKey_Returns401()
+        public async Task CreateApp_WithoutToken_Returns401()
         {
             var http = _factory.CreateApiClient();
 
-            var response = await http.PostAsJsonAsync("/api/application-client", new { name = "Nope" });
+            var response = await http.PostAsJsonAsync("/api/apps", new { name = "Nope" });
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
@@ -131,7 +131,8 @@ namespace auth.integrationTest
         {
             var limited = _factory.WithWebHostBuilder(b => b.UseSetting("RateLimiting:Credentials:PermitLimit", "3"));
             var api = new ApiClient(limited.CreateClient(new() { BaseAddress = new Uri("https://localhost"), HandleCookies = false }));
-            var app = await api.CreateAppAsync();
+            // Created through the unlimited client: the admin login would count against the limit
+            var app = await _api.CreateAppAsync();
 
             var statuses = new List<HttpStatusCode>();
             for (var i = 0; i < 5; i++)

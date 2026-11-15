@@ -17,6 +17,13 @@ namespace auth.webapi.Models
         // The app's own API validates it so it only accepts tokens issued for it.
         public string Audience { get; set; } = null!;
 
+        // When false, POST /api/auth/register is rejected and only existing users can sign in
+        public bool RegistrationEnabled { get; set; } = true;
+
+        // True only for the Argus app, which the service creates for its own admin console on first start.
+        // It's hidden from the apps API and can't be edited or deleted there.
+        public bool IsSystem { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public ICollection<AppUser> Users { get; set; } = new List<AppUser>();
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

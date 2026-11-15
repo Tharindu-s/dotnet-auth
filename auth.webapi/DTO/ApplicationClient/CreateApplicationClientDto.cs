@@ -15,5 +15,7 @@ namespace auth.webapi.DTO.ApplicationClient
         // Public clients (browser apps) get no API key and must list the origins they run on
         public bool IsPublic { get; set; }
         public List<string>? AllowedOrigins { get; set; }
+
+        public bool RegistrationEnabled { get; set; } = true;
     }
 }

@@ -338,5 +338,76 @@ namespace auth.unitTest.Auth
         {
             await Assert.ThrowsAsync<UserNotFoundException>(() => _t.Auth.GetCurrentUserAsync("missing"));
         }
+
+        // Registration switch
+
+        [Fact]
+        public async Task Register_WhenSignUpsAreOff_Throws()
+        {
+            var closed = await _t.CreateAppAsync("Closed", registrationEnabled: false);
+
+            await Assert.ThrowsAsync<RegistrationDisabledException>(() => RegisterAsync(app: closed));
+            Assert.False(await _t.Db.Users.AnyAsync());
+        }
+
+        // Change password
+
+        [Fact]
+        public async Task ChangePassword_NewPasswordWorks_OldDoesNot()
+        {
+            var user = await RegisterAsync();
+
+            await _t.Auth.ChangePasswordAsync(user.Id, new() { CurrentPassword = Password, NewPassword = "N3w-Passw0rd!" }, user.RefreshToken);
+
+            await LoginAsync("jane@example.com", "N3w-Passw0rd!");
+            await Assert.ThrowsAsync<InvalidCredentialsException>(() => LoginAsync("jane@example.com", Password));
+        }
+
+        [Fact]
+        public async Task ChangePassword_KeepsThisSession_RevokesTheOthers()
+        {
+            var thisDevice = await RegisterAsync();
+            var otherDevice = await LoginAsync("jane@example.com");
+
+            await _t.Auth.ChangePasswordAsync(thisDevice.Id, new() { CurrentPassword = Password, NewPassword = "N3w-Passw0rd!" }, thisDevice.RefreshToken);
+
+            Assert.False((await FindTokenAsync(thisDevice.RefreshToken)).IsRevoked);
+            Assert.True((await FindTokenAsync(otherDevice.RefreshToken)).IsRevoked);
+        }
+
+        [Fact]
+        public async Task ChangePassword_ClearsMustChangePassword()
+        {
+            var user = await RegisterAsync();
+            await _t.Db.Users.Where(u => u.Id == user.Id).ExecuteUpdateAsync(s => s.SetProperty(u => u.MustChangePassword, true));
+
+            await _t.Auth.ChangePasswordAsync(user.Id, new() { CurrentPassword = Password, NewPassword = "N3w-Passw0rd!" }, null);
+
+            Assert.False((await _t.Auth.GetCurrentUserAsync(user.Id)).MustChangePassword);
+        }
+
+        [Fact]
+        public async Task ChangePassword_WrongCurrentPassword_ThrowsAndKeepsTheFlag()
+        {
+            var user = await RegisterAsync();
+            await _t.Db.Users.Where(u => u.Id == user.Id).ExecuteUpdateAsync(s => s.SetProperty(u => u.MustChangePassword, true));
+
+            var error = await Assert.ThrowsAsync<PasswordChangeFailedException>(() =>
+                _t.Auth.ChangePasswordAsync(user.Id, new() { CurrentPassword = "Wr0ng-pass!", NewPassword = "N3w-Passw0rd!" }, null));
+
+            Assert.Equal("The current password is incorrect.", error.Message);
+            Assert.True((await _t.Auth.GetCurrentUserAsync(user.Id)).MustChangePassword);
+        }
+
+        [Theory]
+        [InlineData("short")]
+        [InlineData(Password)]
+        public async Task ChangePassword_WeakOrUnchangedPassword_Throws(string newPassword)
+        {
+            var user = await RegisterAsync();
+
+            await Assert.ThrowsAsync<PasswordChangeFailedException>(() =>
+                _t.Auth.ChangePasswordAsync(user.Id, new() { CurrentPassword = Password, NewPassword = newPassword }, null));
+        }
     }
 }

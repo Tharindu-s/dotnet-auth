@@ -16,5 +16,8 @@ namespace auth.webapi.Interfaces
         Task<CurrentUserDto> GetCurrentUserAsync(string userId);
         Task<List<UserSessionDto>> GetUserSessionsAsync(string userId, string? currentRefreshToken);
         Task RevokeSessionAsync(string userId, int sessionId);
+
+        // Also clears MustChangePassword and revokes every session except the one currentRefreshToken belongs to
+        Task ChangePasswordAsync(string userId, ChangePasswordDto dto, string? currentRefreshToken);
     }
 }
