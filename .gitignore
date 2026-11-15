@@ -52,3 +52,5 @@ _ReSharper.*
 secrets.json 
 private_key.pem
 dev-signing-key.pem
+
+*.claude
