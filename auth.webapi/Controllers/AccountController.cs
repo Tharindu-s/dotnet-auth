@@ -96,10 +96,14 @@ namespace auth.webapi.Controllers
             return NoContent();
         }
 
-        [HttpGet("test")]
-        public IActionResult Test()
+        // Signs out the user's other devices; this session stays signed in
+        [Authorize]
+        [HttpPost("change-password")]
+        [EnableRateLimiting(ServiceExtentions.CredentialsRateLimitPolicy)]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
         {
-            return Ok(new { message = "Test successful" });
+            await _authService.ChangePasswordAsync(CurrentUserId, dto, Request.Cookies[RefreshTokenCookie]);
+            return NoContent();
         }
 
         private static AuthenticatedUser ToAuthenticatedUser(ResponseUserDto user) => new()

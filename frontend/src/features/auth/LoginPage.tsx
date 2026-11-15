@@ -1,12 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useLocation, useNavigate, type Location } from 'react-router'
+import { useLocation, useNavigate, type Location } from 'react-router'
 import { FormField } from '@/components/FormField'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { FieldGroup } from '@/components/ui/field'
+import { Spinner } from '@/components/ui/spinner'
 import { getErrorMessage } from '@/lib/errors'
-import { AuthCard } from './AuthCard'
+import { AuthLayout } from './AuthLayout'
 import { loginSchema, type LoginInput } from './schemas'
 import { signIn } from './session'
 
@@ -24,6 +26,7 @@ export function LoginPage() {
     setServerError(null)
     try {
       await signIn(values)
+      // A first sign-in is sent on to /change-password by the route guard
       const from = (location.state as { from?: Location } | null)?.from?.pathname ?? '/'
       navigate(from, { replace: true })
     } catch (error) {
@@ -32,40 +35,39 @@ export function LoginPage() {
   })
 
   return (
-    <AuthCard
+    <AuthLayout
       tabTitle="Sign in"
-      eyebrow="Secure sign-in"
-      title="Welcome back."
-      description="Log in with your email and password to pick up where you left off."
-      headerLink={{ to: '/register', label: 'Create account' }}
+      title="Welcome back"
+      description="Sign in to manage the apps that use this auth server."
       footer={
         <p>
-          New here?{' '}
-          <Link to="/register" className="font-medium text-foreground underline underline-offset-4">
-            Create an account
-          </Link>
+          First time? Use <code>ADMIN_EMAIL</code> from your <code>.env</code>. The password is <code>ADMIN_PASSWORD</code>, or
+          the one printed in the API logs if you left it empty.
         </p>
       }
     >
-      <form onSubmit={onSubmit} noValidate className="grid gap-4">
-        {serverError && (
-          <Alert variant="destructive">
-            <AlertDescription>{serverError}</AlertDescription>
-          </Alert>
-        )}
-        <FormField id="email" label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
-        <FormField
-          id="password"
-          label="Password"
-          type="password"
-          autoComplete="current-password"
-          error={errors.password?.message}
-          {...register('password')}
-        />
-        <Button type="submit" size="lg" className="mt-2 w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Logging in…' : 'Log in'}
-        </Button>
+      <form onSubmit={onSubmit} noValidate>
+        <FieldGroup>
+          {serverError && (
+            <Alert variant="destructive">
+              <AlertDescription>{serverError}</AlertDescription>
+            </Alert>
+          )}
+          <FormField id="email" label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
+          <FormField
+            id="password"
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          <Button type="submit" size="lg" className="h-11 w-full rounded-full" disabled={isSubmitting}>
+            {isSubmitting && <Spinner />}
+            {isSubmitting ? 'Logging in…' : 'Log in'}
+          </Button>
+        </FieldGroup>
       </form>
-    </AuthCard>
+    </AuthLayout>
   )
 }

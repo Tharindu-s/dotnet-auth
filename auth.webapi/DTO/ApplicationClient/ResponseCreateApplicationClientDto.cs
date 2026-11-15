@@ -1,12 +1,8 @@
-
 namespace auth.webapi.DTO.ApplicationClient
 {
-    public class ResponseCreateApplicationClientDto
+    public class ResponseCreateApplicationClientDto : ApplicationClientDto
     {
-        public Guid Id { get; set; }
-        public string Audience { get; set; } = null!;
-        public bool IsPublic { get; set; }
-        public List<string> AllowedOrigins { get; set; } = new();
-        public string? RawApiKey { get; set; } // wont be stored anywhere and will be shown once. Null for public clients.
+        // Shown once and never stored, only its hash is. Null for public clients.
+        public string? RawApiKey { get; set; }
     }
 }

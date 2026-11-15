@@ -20,18 +20,20 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Enter your password.'),
 })
 
-export const registerSchema = z
+export const changePasswordSchema = z
   .object({
-    fullName: z.string().trim().min(1, 'Enter your name.').max(100),
-    email: z.email('Enter a valid email address.').max(256),
-    city: z.string().trim().min(1, 'Enter your city.').max(100),
-    password: passwordSchema,
+    currentPassword: z.string().min(1, 'Enter your current password.'),
+    newPassword: passwordSchema,
     confirmPassword: z.string(),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords don't match.",
     path: ['confirmPassword'],
   })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    message: 'Choose a password different from the current one.',
+    path: ['newPassword'],
+  })
 
 export type LoginInput = z.infer<typeof loginSchema>
-export type RegisterInput = z.infer<typeof registerSchema>
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>

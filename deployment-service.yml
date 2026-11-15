@@ -4,13 +4,15 @@
 #   kubectl create secret generic dotnet-auth-secrets -n dotnet-authentication \
 #     --from-literal=ConnectionStrings__DefaultConnection='Host=...;Database=...;Username=...;Password=...' \
 #     --from-literal=Security__ApiKeySalt="$(openssl rand -base64 32)" \
-#     --from-literal=Security__AdminApiKey="$(openssl rand -base64 32)" \
-#     --from-literal=EmailSettings__From='you@example.com' \
-#     --from-literal=EmailSettings__Username='you@example.com' \
-#     --from-literal=EmailSettings__Password='<app password>' \
+#     --from-literal=Argus__AdminEmail='you@example.com' \
+#     --from-literal=Argus__AdminPassword='<initial admin password, changed at first sign-in>' \
 #     --from-file=JWT__PrivateKey=signing-key.pem
 #
+# Optional SMTP for welcome emails: add EmailSettings__From, EmailSettings__Username and EmailSettings__Password.
+#
 # Every replica loads the same signing key, so tokens survive restarts and validate on any pod.
+# On start, the API applies migrations (EF Core takes a lock, so replicas don't race) and creates
+# the Argus app and its first admin if they don't exist.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,6 +38,11 @@ spec:
             - secretRef:
                 name: dotnet-auth-secrets
           env:
+            - name: Database__MigrateOnStartup
+              value: "true"
+            # The URL users open Argus at. Set it to your real host.
+            - name: Argus__AllowedOrigins__0
+              value: https://argus.example.com
             # Trust X-Forwarded-For from inside the cluster (the frontend's nginx).
             # Match this to your cluster's pod network.
             - name: ForwardedHeaders__KnownNetworks__0
@@ -55,10 +62,10 @@ spec:
       targetPort: 8080
   type: LoadBalancer
 ---
-# React frontend: nginx serving the static build and proxying /api to the service above,
-# so the browser sees one origin. Build the image with the public app's ID:
-#   docker build -t tharindu007/dotnet-auth-frontend:latest --build-arg VITE_APP_ID=<public app id> frontend
-# The public app's allowedOrigins must include the URL users open, and TLS must terminate
+# Argus, the admin console: nginx serving the static build and proxying /api to the service above,
+# so the browser sees one origin.
+#   docker build -t tharindu007/dotnet-auth-frontend:latest frontend
+# Argus__AllowedOrigins above must match the URL users open, and TLS must terminate
 # in front of it, because the refresh cookie is Secure.
 apiVersion: apps/v1
 kind: Deployment

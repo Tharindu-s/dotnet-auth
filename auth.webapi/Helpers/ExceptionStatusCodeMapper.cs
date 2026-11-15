@@ -18,7 +18,12 @@ namespace auth.webapi.Helpers
                 { typeof(InvalidRefreshTokenException), HttpStatusCode.Unauthorized },
                 { typeof(AccountLockedException), HttpStatusCode.Locked },
                 { typeof(UserCreationFailedException), HttpStatusCode.BadRequest},
-                { typeof(InvalidTokenException), HttpStatusCode.Unauthorized }
+                { typeof(InvalidTokenException), HttpStatusCode.Unauthorized },
+                { typeof(AppForbiddenException), HttpStatusCode.Forbidden },
+                { typeof(PasswordChangeRequiredException), HttpStatusCode.Forbidden },
+                { typeof(PasswordChangeFailedException), HttpStatusCode.BadRequest },
+                { typeof(RegistrationDisabledException), HttpStatusCode.Forbidden },
+                { typeof(ApplicationClientNotFoundException), HttpStatusCode.NotFound }
             }.ToImmutableDictionary();
     }
 }

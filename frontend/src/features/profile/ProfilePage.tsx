@@ -1,50 +1,62 @@
-import { useQuery } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
-import { PageHeader } from '@/components/AppLayout'
+import { KeyRound } from 'lucide-react'
+import { Link } from 'react-router'
+import { Page, PageHeader } from '@/components/AppLayout'
+import { CopyInput } from '@/components/CopyInput'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { fetchMe } from '@/features/auth/api'
+import { FieldGroup } from '@/components/ui/field'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { initials } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user)
-  // The store already has the basics; /me adds roles and the app ID
-  const me = useQuery({ queryKey: ['me'], queryFn: fetchMe })
-
   if (!user) return null
 
-  const rows: [string, ReactNode][] = [
-    ['Email', user.email],
-    ['City', user.city],
-    [
-      'Roles',
-      me.data
-        ? me.data.roles.map((role) => (
-            <Badge key={role} className="rounded-full bg-white px-2.5 text-ink">
-              {role}
-            </Badge>
-          ))
-        : '…',
-    ],
-    ['App ID', <code key="app" className="text-xs">{me.data?.appId ?? '…'}</code>],
-    ['User ID', <code key="user" className="text-xs">{user.id}</code>],
-  ]
-
   return (
-    <>
-      <PageHeader tabTitle="Profile" eyebrow="Your account" title={user.fullName} description="The details this service holds about you." />
-      <Card>
-        <CardContent>
-          <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-[8rem_1fr]">
-            {rows.map(([label, value]) => (
-              <div key={label} className="contents">
-                <dt className="text-sm text-muted-foreground">{label}</dt>
-                <dd className="flex flex-wrap items-center gap-1.5 text-sm break-all text-ink">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
-    </>
+    <Page className="max-w-3xl">
+      <PageHeader tabTitle="Profile" title="Profile" description="The admin account you sign in to this console with." />
+      <div className="grid gap-6">
+        <Card>
+          <CardContent>
+            <Item className="p-0">
+              <ItemMedia>
+                <Avatar className="size-14">
+                  <AvatarFallback className="text-lg">{initials(user.fullName)}</AvatarFallback>
+                </Avatar>
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle className="text-lg">{user.fullName}</ItemTitle>
+                <ItemDescription>{user.email}</ItemDescription>
+                <div className="flex gap-1.5">
+                  {user.roles.map((role) => (
+                    <Badge key={role} variant="secondary">
+                      {role}
+                    </Badge>
+                  ))}
+                </div>
+              </ItemContent>
+              <ItemActions>
+                <Button asChild variant="outline" className="rounded-full bg-white">
+                  <Link to="/change-password">
+                    <KeyRound /> Change password
+                  </Link>
+                </Button>
+              </ItemActions>
+            </Item>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <FieldGroup>
+              <CopyInput label="Argus app ID" value={user.appId} description="The app this console signs you in through." />
+              <CopyInput label="User ID" value={user.id} />
+            </FieldGroup>
+          </CardContent>
+        </Card>
+      </div>
+    </Page>
   )
 }

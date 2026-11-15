@@ -1,11 +1,13 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import { config } from '@/lib/config'
+import { config, getArgusConfig } from '@/lib/config'
 import { useAuthStore } from '@/stores/auth'
 
 declare module 'axios' {
   interface AxiosRequestConfig {
-    /** Don't try to refresh on a 401 (login, register, refresh itself) */
+    /** Don't try to refresh on a 401 (login, refresh itself) */
     skipAuthRefresh?: boolean
+    /** Send X-App-Id: the endpoint needs to know which app is calling (login, logout) */
+    sendAppId?: boolean
   }
   interface InternalAxiosRequestConfig {
     _retried?: boolean
@@ -18,11 +20,11 @@ export const api = axios.create({
   withCredentials: true,
 })
 
-api.interceptors.request.use((request) => {
+api.interceptors.request.use(async (request) => {
   const token = useAuthStore.getState().accessToken
   if (token && !request.headers.Authorization) request.headers.Authorization = `Bearer ${token}`
-  // The app is a public client: it identifies itself with its ID and the browser's Origin header
-  if (config.appId) request.headers['X-App-Id'] = config.appId
+  // Argus is a public client: it identifies itself with its app ID and the browser's Origin header
+  if (request.sendAppId) request.headers['X-App-Id'] = (await getArgusConfig()).appId
   return request
 })
 

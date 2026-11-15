@@ -61,3 +61,13 @@ export function ArgusLogo({ className }: { className?: string }) {
     </Link>
   )
 }
+
+/** The mark on a soft peach and lilac glow, above welcome headings */
+export function ArgusGlowMark({ size = 56, className }: { size?: number; className?: string }) {
+  return (
+    <div aria-hidden className={cn('relative grid place-items-center', className)} style={{ width: size * 2.4, height: size * 2.4 }}>
+      <div className="mark-glow absolute inset-0 rounded-full" />
+      <ArgusMark size={size} cut="standard" className="relative drop-shadow-sm" />
+    </div>
+  )
+}
